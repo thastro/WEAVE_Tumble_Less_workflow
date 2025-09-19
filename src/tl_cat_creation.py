@@ -113,7 +113,7 @@ def decode_byte_columns(df: pd.DataFrame, to_string_dtype: bool = True) -> pd.Da
     return df
 
 
-def combine_wg_with_input_cat(input_df, wg_df, id_col='CNAME'):
+def combine_wg_with_input_cat(input_df, wg_df, src_id_col='CNAME'):
 
     """
     Combine the input DataFrame with the WEAVE guide star DataFrame, ensuring that only
@@ -136,7 +136,7 @@ def combine_wg_with_input_cat(input_df, wg_df, id_col='CNAME'):
     input_df = input_df.copy()
     input_df.loc[:, 'sourceFlag'] = 0
 
-    new_rows = wg_df[~wg_df[id_col].isin(input_df[id_col])].copy()
+    new_rows = wg_df[~wg_df[src_id_col].isin(input_df[src_id_col])].copy()
 
     # Select only columns that match input_df
     common_cols = [col for col in input_df.columns if col in new_rows.columns]

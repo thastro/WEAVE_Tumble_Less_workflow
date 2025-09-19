@@ -1626,7 +1626,6 @@ def assign_sky_attributes(df):
     return df
 
 
-
 def run_guide_fibre_allocation(df_field_selection,
                                wg_comb_df,
                                lookup_df,
@@ -1640,10 +1639,10 @@ def run_guide_fibre_allocation(df_field_selection,
                                incl_guide_layer=False,
                                perfect_fields_only=False,
                                verbose=False,
-                               mag_col='gaiaV',
+                               mag_col='GAIA_MAG_G',
                                ra_col='GAIA_RA',
                                de_col='GAIA_DEC',
-                               src_id='CNAME',
+                               src_id_col='CNAME',
                                guide_reach_factor=18.0,
                                broken_fibres=None,
                                add_sky_targets=False,
@@ -1772,8 +1771,8 @@ def run_guide_fibre_allocation(df_field_selection,
         matched_rows = lookup_df[lookup_df['lutFieldId'].apply(
             _match_field_ids_w_lookup_table, field_ids=batch_field_ids)]
 
-        central_guide_ids = batch[batch['guide'] == 1][src_id].unique()
-        src_ids_from_lut = matched_rows[src_id].unique()
+        central_guide_ids = batch[batch['guide'] == 1][src_id_col].unique()
+        src_ids_from_lut = matched_rows[src_id_col].unique()
         src_ids_from_lut = np.setdiff1d(src_ids_from_lut, central_guide_ids)
 
         if src_ids_from_lut.shape[0] > 6000:
@@ -1781,14 +1780,14 @@ def run_guide_fibre_allocation(df_field_selection,
             src_ids_from_lut = rng.choice(src_ids_from_lut, 6000, replace=False)
 
         # Now get all the guide stars for each field and add them to the batch
-        guide_star_rows = wg_comb_df[wg_comb_df[src_id].isin(src_ids_from_lut)]
+        guide_star_rows = wg_comb_df[wg_comb_df[src_id_col].isin(src_ids_from_lut)]
         if guide_star_rows.empty:
             logging.warning(f'No guide stars found for Batch-Id: {batch_id} '
                             'Skipping this batch.')
             continue
 
         # Add the queried guide stars to the current batch.
-        batch = pd.concat([batch, guide_star_rows], ignore_index=True).astype({src_id: 'str'})
+        batch = pd.concat([batch, guide_star_rows], ignore_index=True).astype({src_id_col: 'str'})
 
         # Set batchId for the added guide stars that have no batchId set
         batch.loc[batch['batchId'].isna(), 'batchId'] = batch['batchId'].unique()[0]
@@ -1796,7 +1795,7 @@ def run_guide_fibre_allocation(df_field_selection,
         # Explode the batch to account for guide stars that are part of multiple fields.
         batch = _explode_batch_by_lookup(batch=batch, lookup_df=lookup_df,
                                          batch_field_ids=batch_field_ids,
-                                         src_id_col=src_id,
+                                         src_id_col=src_id_col,
                                          field_id_col="fieldId",
                                          lut_field_col="lutFieldId")
 
@@ -1813,7 +1812,7 @@ def run_guide_fibre_allocation(df_field_selection,
                                             ra_col=ra_col,
                                             de_col=de_col,
                                             mag_col=mag_col,
-                                            src_id=src_id,
+                                            src_id=src_id_col,
                                             guide_reach_factor=guide_reach_factor,
                                             broken_fibres=broken_fibres)
 
@@ -1869,7 +1868,7 @@ def run_guide_fibre_allocation(df_field_selection,
                 print('Guide fibre assignment: ')
                 print('------------------------------------------------------'
                       '------------------')
-                print(guide_star_df[[src_id, 'fieldId', 'guide',
+                print(guide_star_df[[src_id_col, 'fieldId', 'guide',
                                      'fibreId', 'sourceFlag', mag_col]
                                     ].sort_values(by=['fieldId', 'guide']))
                 print('------------------------------------------------------'
@@ -1912,12 +1911,12 @@ def run_guide_fibre_allocation(df_field_selection,
             batch = batch[(batch['fieldId'].isin(guide_star_df['fieldId'].unique())) |
                           (~batch['fibreId'].isna())]
 
-    combined_guide_frame = pd.concat(guide_dfs).astype({src_id: 'str',
+    combined_guide_frame = pd.concat(guide_dfs).astype({src_id_col: 'str',
                                                         'fibreId': np.int64,
                                                         'fieldId': np.int64,
                                                         'batchId': np.int64})
 
-    combined_science_frame = pd.concat(science_dfs).astype({src_id: 'str'})
+    combined_science_frame = pd.concat(science_dfs).astype({src_id_col: 'str'})
 
     # df_field_selection.loc[:, 'fibreId'] = np.nan
     # df_field_selection.loc[:, 'gateDist'] = np.nan
@@ -1959,7 +1958,7 @@ def run_guide_fibre_allocation(df_field_selection,
             df_field_selection,
             ra_col=ra_col,
             de_col=de_col,
-            src_id=src_id,
+            src_id=src_id_col,
             mag_col=mag_col,
             plate=plate,
             guide_mag_limit=guide_mag_limit,
@@ -1992,7 +1991,7 @@ def run_guide_fibre_allocation(df_field_selection,
     print('------------------------------------------------------'
           '------------------')
 
-    field_selection_with_guides = field_selection_with_guides.astype({src_id: 'str'})
+    field_selection_with_guides = field_selection_with_guides.astype({src_id_col: 'str'})
 
     # print(field_selection_with_guides[
     #             field_selection_with_guides['sourceFlag'] == -1][src_id])

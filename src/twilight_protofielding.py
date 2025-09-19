@@ -528,7 +528,8 @@ class TLOBXML(OBXML):
                                      guide_mag_lim=99.,
                                      calib_mag_lim=99.,
                                      calib_stars=False,
-                                     verbose=False):
+                                     verbose=False,
+                                     add_cnames=False):
 
         self._add_tl_guide_stars(guide_star_frame, field_template,
                                  plot_filename=guide_plot_filename,
@@ -563,7 +564,8 @@ class TLOBXML(OBXML):
                                   max_cut=max_calib_cut,
                                   calib_mixres=calib_mixres,
                                   cache=cache,
-                                  mag_lim=calib_mag_lim)
+                                  mag_lim=calib_mag_lim,
+                                  add_cnames=add_cnames)
 
     def _set_guide_star_batch(self, guide_star_frame):
         self.guide_star_batch = guide_star_frame.reset_index(drop=True).astype({'GAIA_ID': str})
@@ -1162,7 +1164,6 @@ class TLDriverCat:
             'obsgroup_validity': obsgroup_validity,
         }
 
-        # TODO Change this to not need pa as input (get it from hemisphere)
         assert pa is not None
 
         if pa is not None:
@@ -1286,7 +1287,8 @@ class TLDriverCat:
             # print('batch data', batch_data[['TARGNAME', 'TARGPROG']])
             filtered_batch_data = batch_data[targets_mask]
             # print('filtered batch data', filtered_batch_data[['TARGNAME', 'TARGPROG']])
-            #print(filtered_batch_data)
+
+            # Add targets to the field
             batch_xml.add_table_as_targets(field_element, filtered_batch_data)
 
             # Set guide star batch variable (pandas Dataframe) using the current field id
@@ -1955,7 +1957,7 @@ def create_plate_fits_file(infile,
                            plate='A',
                            hemisphere='N',
                            outpath='./',
-                           id_col='CNAME',            # column name in FITS table to match on
+                           src_id_col='CNAME',            # column name in FITS table to match on
                            coverage_targprog_col='TARGPROG'):
 
     """
@@ -1984,12 +1986,12 @@ def create_plate_fits_file(infile,
 
     if plate is not None:
         create_guide_stars_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
-                               de_col='GAIA_DEC', src_id=id_col, hemisphere=hemisphere,
+                               de_col='GAIA_DEC', src_id=src_id_col, hemisphere=hemisphere,
                                output_dir=outpath)
         create_central_target_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
                                   de_col='GAIA_DEC', mag_col='GAIA_MAG_G',
                                   hemisphere=hemisphere,
-                                  src_id=id_col, output_dir=outpath)
+                                  src_id=src_id_col, output_dir=outpath)
 
     if not isinstance(coverage_df, pd.DataFrame):
         raise TypeError("coverage_df must be a pandas DataFrame")
@@ -2052,7 +2054,7 @@ def create_plate_fits_file(infile,
         return uniq[0] if len(uniq) > 0 else ""
 
     # --- Normalise coverage data used for matching/mapping ---
-    cov_cnames = _series_to_clean_str(coverage_df[id_col])
+    cov_cnames = _series_to_clean_str(coverage_df[src_id_col])
     cov_targprog = _series_to_clean_str(coverage_df[coverage_targprog_col])
 
     keep_set = set(cov_cnames.tolist())
@@ -2060,7 +2062,7 @@ def create_plate_fits_file(infile,
 
     # Identify sky rows to append: sourceFlag == -1 and CNAME missing/blank
     sky_mask = (coverage_df.get('sourceFlag', pd.Series([], dtype='Int64')) == -1)
-    blank_cname_mask = _series_to_clean_str(coverage_df[id_col]).eq('')
+    blank_cname_mask = _series_to_clean_str(coverage_df[src_id_col]).eq('')
     append_sky_df = coverage_df[sky_mask & blank_cname_mask].copy()
 
     ext = 1
@@ -2085,7 +2087,7 @@ def create_plate_fits_file(infile,
             tbl = Table(data)
 
             # Robust CNAME normalisation (bytes vs unicode)
-            cname_col_data = tbl[id_col]
+            cname_col_data = tbl[src_id_col]
             if cname_col_data.dtype.kind == 'S':  # bytes
                 norm_cname = np.char.strip(np.char.decode(cname_col_data,
                                                           'utf-8', errors='ignore'))
@@ -2098,12 +2100,12 @@ def create_plate_fits_file(infile,
 
             # If there are kept rows, map/overwrite TARGPROG from coverage_df (original behaviour)
             if len(tbl_filtered) > 0:
-                if tbl_filtered[id_col].dtype.kind == 'S':
+                if tbl_filtered[src_id_col].dtype.kind == 'S':
                     norm_cname_filtered = np.char.strip(
-                        np.char.decode(tbl_filtered[id_col], 'utf-8', errors='ignore')
+                        np.char.decode(tbl_filtered[src_id_col], 'utf-8', errors='ignore')
                     )
                 else:
-                    norm_cname_filtered = np.char.strip(tbl_filtered[id_col].astype(str))
+                    norm_cname_filtered = np.char.strip(tbl_filtered[src_id_col].astype(str))
 
                 mapped_targprog = np.array(
                     [cname_to_targprog.get(cn, "") for cn in norm_cname_filtered],
@@ -2127,7 +2129,7 @@ def create_plate_fits_file(infile,
                     else:
                         tbl_filtered['TARGPROG'] = mapped_targprog.astype(str)
 
-            # --- NEW: append sky rows (sourceFlag == -1, blank CNAME) at the end ---
+            # append sky rows (sourceFlag == -1, blank CNAME) at the end
             if len(append_sky_df) > 0:
                 schema_ref = tbl_filtered if len(tbl_filtered) > 0 else tbl
                 names = list(schema_ref.colnames)
@@ -2140,7 +2142,7 @@ def create_plate_fits_file(infile,
                         src_vals = append_sky_df[c]
                     elif c == 'TARGPROG' and coverage_targprog_col in append_sky_df.columns:
                         src_vals = append_sky_df[coverage_targprog_col]
-                    elif c == id_col:
+                    elif c == src_id_col:
                         src_vals = pd.Series([''] * n_new)
                     else:
                         src_vals = pd.Series([np.nan] * n_new)
@@ -2152,8 +2154,8 @@ def create_plate_fits_file(infile,
                 sky_tbl = Table(col_data)
 
                 tbl_out = vstack([tbl_filtered, sky_tbl],
-                                  join_type='exact',
-                                  metadata_conflicts='silent') if len(tbl_filtered) > 0 else sky_tbl
+                                 join_type='exact',
+                                 metadata_conflicts='silent') if len(tbl_filtered) > 0 else sky_tbl
             else:
                 tbl_out = tbl_filtered
 
@@ -2175,8 +2177,6 @@ def create_plate_fits_file(infile,
     obstemp_str = _unique_nonempty_from_table(out_tbl, 'OBSTEMP')
 
     return progtemp_str, obstemp_str
-
-
 
 
 

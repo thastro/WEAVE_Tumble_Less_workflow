@@ -1,7 +1,7 @@
 #!/bin/bash
 
-input_path_base="/xmls/plate"
-output_path_base="/xmls/configure"
+input_path_base="./xmls/plate"
+output_path_base="./xmls/configure"
 
 
 epoch=2024.0

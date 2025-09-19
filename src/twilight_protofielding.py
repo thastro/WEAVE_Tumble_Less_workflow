@@ -979,7 +979,6 @@ class TLDriverCat:
                       # pa=None
                       ):
 
-
         self.report_verbosity = int(np.clip(report_verbosity, 0, 1))
 
         current_time = Time(time.time(), format='unix')
@@ -1066,10 +1065,14 @@ class TLDriverCat:
         print('-----------------------------------------------------------------------')
 
         targsrvy_list = list(set([target['TARGSRVY'] for target in self.data]))
+        targsrvy_list = list(filter(None, targsrvy_list))
         targsrvy_list.sort()
 
-        # Guess some parameters from obstemp
+        if len(targsrvy_list) > 1:
+            logging.warning('Multiple TARGSRVY values found in the input catalogue:'
+                            f' {targsrvy_list}')
 
+        # Guess some parameters from obstemp
         obsconstraints_dict = get_obstemp_info(obstemp,
                                                obstemp_dict=self.obstemp_dict)
 
@@ -1119,13 +1122,14 @@ class TLDriverCat:
         batch_xml.remove_non_used_elements()
 
         # Set the attributes of the root element
-        ifu_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/ifu'
-        ifu_version = 'WIW{}'.format(get_version(ifu_path))
+        # ifu_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/ifu'
+        # ifu_version = 'WIW{}'.format(get_version(ifu_path))
 
-        mos_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/mos'
-        mos_version = 'WMW{}'.format(get_version(mos_path))
+        # mos_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/mos'
+        # mos_version = 'WMW{}'.format(get_version(mos_path))
+        # comment = '{} {}'.format(ifu_version,  mos_version)
 
-        comment = '{} {}'.format(ifu_version, mos_version)
+        comment = '{} {}'.format('WIWv0.6-dirty',  'WMWv0.1-17-g89d9d5cd-dirty')
 
         root_attrib_dict = {
             'author': self.header_values['CAT_MAIL'][0],
@@ -1586,8 +1590,12 @@ def assign_targprog(catalogue_df):
 def assign_target_attributes(catalogue_df, src_id='dr3_source_id', conditions=None):
     # TODO Needs to change to accomodate the added SKY targets
     catalogue_df['targclass'] = 'STAR'
+    catalogue_df.loc[catalogue_df['sourceFlag'] == -1, 'targclass'] = 'SKY'
+
     catalogue_df['targuse'] = 'T'
     catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'targuse'] = 'G'
+    catalogue_df.loc[catalogue_df['sourceFlag'] == -1, 'targuse'] = 'S'
+
 
     # Default priority
     catalogue_df['targprio'] = 1.0
@@ -1878,6 +1886,7 @@ def create_twilight_input_catalogue(catalogue_csv,
         catalogue_name = f'{targsrvy}'
 
     catalogue_df = pd.read_csv(catalogue_csv).astype({src_id: str})
+
     # Define targsrvy, targcat, etc.
     #catalogue_df['TARGSRVY'] = targsrvy
     #catalogue_df['TARGCAT'] = targsrvy + '.fits'
@@ -1941,30 +1950,35 @@ def create_twilight_input_catalogue(catalogue_csv,
         hdu.writeto(output_dir + catalogue_name + '.fits', overwrite=True, checksum=True)
 
 
-def create_plate_fits_file(
-    infile,
-    coverage_df,
-    plate='A',
-    hemisphere='N',    
-    outpath='./',
-    id_col='CNAME',                 # column name in FITS table to match on
-    coverage_targprog_col='TARGPROG'):
+def create_plate_fits_file(infile,
+                           coverage_df,
+                           plate='A',
+                           hemisphere='N',
+                           outpath='./',
+                           id_col='CNAME',            # column name in FITS table to match on
+                           coverage_targprog_col='TARGPROG'):
 
     """
     Build a new FITS:
-      - Keep only rows in HDU[1] where `id_col` is present in coverage_df[cname_col].
+      - Keep only rows in HDU[1] where `id_col` is present in coverage_df[id_col].
       - Overwrite/define TARGPROG in HDU[1] from coverage_df[coverage_targprog_col],
         matched by CNAME.
+      - Additionally, append rows from coverage_df where sourceFlag == -1 and CNAME is
+        missing/blank to the end of the table (these rows are not matched by CNAME).
       - Preserve Primary HDU and all other extensions unchanged.
       - Write with checksums.
 
     Returns
     -------
     progtemp_str : str
-        The (single) PROGTEMP value found in the filtered HDU[1].
+        The PROGTEMP value from non-sky rows (first non-empty unique).
     obstemp_str : str
-        The (single) OBSTEMP value found in the filtered HDU[1].
+        The OBSTEMP value from non-sky rows (first non-empty unique).
     """
+    import numpy as np
+    import pandas as pd
+    from astropy.io import fits
+    from astropy.table import Table, vstack
 
     infile_name = infile.split("/")[-1].split(".")[0]
 
@@ -1980,12 +1994,74 @@ def create_plate_fits_file(
     if not isinstance(coverage_df, pd.DataFrame):
         raise TypeError("coverage_df must be a pandas DataFrame")
 
-    # Normalise coverage data
-    cov_cnames = coverage_df[id_col].astype(str).str.strip()
-    cov_targprog = coverage_df[coverage_targprog_col].astype(str).str.strip()
 
-    keep_set = set(cov_cnames.values)
-    cname_to_targprog = dict(zip(cov_cnames.values, cov_targprog.values))
+    # --- Helpers ---
+    def _series_to_clean_str(s):
+        return (s.astype('string')
+                 .str.strip()
+                 .fillna(''))
+
+    def _to_bytes_array(values, target_dtype):
+        return np.asarray([str(v).encode('utf-8') for v in values], dtype=target_dtype)
+
+    def _coerce_to_dtype(values, target_dtype):
+        """Coerce a 1D array-like 'values' into the numpy dtype of a FITS column."""
+        kind = target_dtype.kind
+        if kind == 'S':  # fixed-length bytes
+            return _to_bytes_array(values, target_dtype)
+        if kind == 'U':  # unicode
+            return np.asarray([str(v) for v in values], dtype=target_dtype)
+        if kind == 'f':  # float
+            arr = pd.to_numeric(values, errors='coerce').to_numpy(dtype=float)
+            return arr.astype(target_dtype, copy=False)
+        if kind in ('i', 'u'):  # ints
+            arr = pd.to_numeric(values, errors='coerce').fillna(0).to_numpy(dtype=np.int64)
+            return arr.astype(target_dtype, copy=False)
+        if kind == 'b':  # bool
+            return np.asarray(values, dtype=bool).astype(target_dtype, copy=False)
+        try:
+            return np.asarray(values, dtype=target_dtype)
+        except Exception:
+            return np.asarray([str(v) for v in values], dtype=target_dtype)
+
+    def _unique_nonempty_from_table(table, colname):
+        """Return first non-empty unique string value from table[colname],
+        preferring rows with sourceFlag != -1 if that column exists."""
+        if len(table) == 0 or colname not in table.colnames:
+            return ""
+        col = table[colname]
+        # decode/strip to strings
+        if col.dtype.kind == 'S':
+            vals = np.char.strip(np.char.decode(col, 'utf-8', errors='ignore'))
+        else:
+            vals = np.char.strip(col.astype(str))
+        nonempty = vals != ''
+
+        if 'sourceFlag' in table.colnames:
+            try:
+                sf = np.array(table['sourceFlag'])
+                mask = nonempty & (sf != -1)
+            except Exception:
+                mask = nonempty
+        else:
+            mask = nonempty
+
+        if not np.any(mask):
+            return ""
+        uniq = np.unique(vals[mask])
+        return uniq[0] if len(uniq) > 0 else ""
+
+    # --- Normalise coverage data used for matching/mapping ---
+    cov_cnames = _series_to_clean_str(coverage_df[id_col])
+    cov_targprog = _series_to_clean_str(coverage_df[coverage_targprog_col])
+
+    keep_set = set(cov_cnames.tolist())
+    cname_to_targprog = dict(zip(cov_cnames.tolist(), cov_targprog.tolist()))
+
+    # Identify sky rows to append: sourceFlag == -1 and CNAME missing/blank
+    sky_mask = (coverage_df.get('sourceFlag', pd.Series([], dtype='Int64')) == -1)
+    blank_cname_mask = _series_to_clean_str(coverage_df[id_col]).eq('')
+    append_sky_df = coverage_df[sky_mask & blank_cname_mask].copy()
 
     ext = 1
 
@@ -2005,23 +2081,23 @@ def create_plate_fits_file(
                 new_hdul.append(tbl_hdu.copy())
                 continue
 
-            # Work with an Astropy Table for convenience
+            # Work with an Astropy Table
             tbl = Table(data)
 
             # Robust CNAME normalisation (bytes vs unicode)
             cname_col_data = tbl[id_col]
             if cname_col_data.dtype.kind == 'S':  # bytes
-                norm_cname = np.char.strip(np.char.decode(cname_col_data, 'utf-8', errors='ignore'))
+                norm_cname = np.char.strip(np.char.decode(cname_col_data,
+                                                          'utf-8', errors='ignore'))
             else:
                 norm_cname = np.char.strip(cname_col_data.astype(str))
 
-            # Filter to coverage CNAMEs
+            # Filter to coverage CNAMEs (original behaviour)
             mask_keep = np.isin(norm_cname, list(keep_set))
             tbl_filtered = tbl[mask_keep]
 
-            # If empty, still write an empty table with the same columns/header
+            # If there are kept rows, map/overwrite TARGPROG from coverage_df (original behaviour)
             if len(tbl_filtered) > 0:
-                # Map TARGPROG per kept CNAME from coverage_df
                 if tbl_filtered[id_col].dtype.kind == 'S':
                     norm_cname_filtered = np.char.strip(
                         np.char.decode(tbl_filtered[id_col], 'utf-8', errors='ignore')
@@ -2036,46 +2112,71 @@ def create_plate_fits_file(
 
                 # Ensure/overwrite TARGPROG in the FITS table
                 if 'TARGPROG' not in tbl_filtered.colnames:
-                    tbl_filtered['TARGPROG'] = mapped_targprog.astype(str)
+                    has_bytes = any(tbl_filtered[c].dtype.kind == 'S' for c in tbl_filtered.colnames)
+                    if has_bytes:
+                        width = max(16, int(mapped_targprog.astype(str).map(len).max()
+                                            if len(mapped_targprog) else 16))
+                        dtype = f'S{width}'
+                        tbl_filtered['TARGPROG'] = _to_bytes_array(mapped_targprog, np.dtype(dtype))
+                    else:
+                        tbl_filtered['TARGPROG'] = mapped_targprog.astype(str)
                 else:
-                    if tbl_filtered['TARGPROG'].dtype.kind == 'S':  # bytes column
-                        # Encode to bytes; Astropy will handle padding/truncation
-                        enc = np.array([s.encode('utf-8') for s in mapped_targprog],
-                                       dtype=tbl_filtered['TARGPROG'].dtype)
+                    if tbl_filtered['TARGPROG'].dtype.kind == 'S':
+                        enc = _to_bytes_array(mapped_targprog, tbl_filtered['TARGPROG'].dtype)
                         tbl_filtered['TARGPROG'] = enc
                     else:
                         tbl_filtered['TARGPROG'] = mapped_targprog.astype(str)
 
-            # Rebuild BinTableHDU with same header/name (NAXIS2 updated automatically)
+            # --- NEW: append sky rows (sourceFlag == -1, blank CNAME) at the end ---
+            if len(append_sky_df) > 0:
+                schema_ref = tbl_filtered if len(tbl_filtered) > 0 else tbl
+                names = list(schema_ref.colnames)
+                dtypes = [schema_ref[c].dtype for c in names]
+                n_new = len(append_sky_df)
+
+                col_data = {}
+                for c, dt in zip(names, dtypes):
+                    if c in append_sky_df.columns:
+                        src_vals = append_sky_df[c]
+                    elif c == 'TARGPROG' and coverage_targprog_col in append_sky_df.columns:
+                        src_vals = append_sky_df[coverage_targprog_col]
+                    elif c == id_col:
+                        src_vals = pd.Series([''] * n_new)
+                    else:
+                        src_vals = pd.Series([np.nan] * n_new)
+
+                    if len(src_vals) != n_new:
+                        src_vals = pd.Series(list(src_vals) + [np.nan] * (n_new - len(src_vals)))[:n_new]
+                    col_data[c] = _coerce_to_dtype(src_vals, dt)
+
+                sky_tbl = Table(col_data)
+
+                tbl_out = vstack([tbl_filtered, sky_tbl],
+                                  join_type='exact',
+                                  metadata_conflicts='silent') if len(tbl_filtered) > 0 else sky_tbl
+            else:
+                tbl_out = tbl_filtered
+
+            # Rebuild BinTableHDU with same header/name
             new_tbl = fits.BinTableHDU(
-                data=tbl_filtered.as_array(),
+                data=tbl_out.as_array(),
                 header=tbl_hdu.header.copy(),
                 name=tbl_hdu.name
             )
             new_hdul.append(new_tbl)
 
         # Write with checksums
-        new_hdul.writeto(outpath+infile_name+f"_{plate}_{hemisphere}.fits",
-                         overwrite=True, checksum=True)
+        outfile = f"{outpath}{infile_name}_{plate}_{hemisphere}.fits"
+        new_hdul.writeto(outfile, overwrite=True, checksum=True)
 
-    # Return unique PROGTEMP / OBSTEMP as strings from the *filtered* table
-    # (Handle bytes vs unicode robustly)
+    # Extract PROGTEMP / OBSTEMP from non-sky, non-empty rows
     out_tbl = Table(new_hdul[ext].data)
-
-    def _unique_str(colname):
-        if colname not in out_tbl.colnames or len(out_tbl) == 0:
-            return ""
-        col = out_tbl[colname]
-        if col.dtype.kind == 'S':
-            vals = np.unique(np.char.strip(np.char.decode(col, 'utf-8', errors='ignore')))
-        else:
-            vals = np.unique(np.char.strip(col.astype(str)))
-        return vals[0] if len(vals) > 0 else ""
-
-    progtemp_str = _unique_str('PROGTEMP')
-    obstemp_str = _unique_str('OBSTEMP')
+    progtemp_str = _unique_nonempty_from_table(out_tbl, 'PROGTEMP')
+    obstemp_str = _unique_nonempty_from_table(out_tbl, 'OBSTEMP')
 
     return progtemp_str, obstemp_str
+
+
 
 
 

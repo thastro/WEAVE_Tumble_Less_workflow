@@ -1617,6 +1617,16 @@ def decode_byte_columns(df: pd.DataFrame, to_string_dtype: bool = True) -> pd.Da
     return df
 
 
+def assign_sky_attributes(df):
+
+    assert (df['TARGUSE'] == 'S').any(), "No sky targets found in the DataFrame."
+
+    df.loc[df['sourceFlag'] == -1, 'TARGPRIO'] = 1.0
+
+    return df
+
+
+
 def run_guide_fibre_allocation(df_field_selection,
                                wg_comb_df,
                                lookup_df,
@@ -2032,6 +2042,7 @@ def run_guide_fibre_allocation(df_field_selection,
 
     # Assign TARGPROG values to enable correct xml creation
     field_selection_with_guides = assign_targprog(field_selection_with_guides)
+    field_selection_with_guides = assign_sky_attributes(field_selection_with_guides)
 
     return field_selection_with_guides
 

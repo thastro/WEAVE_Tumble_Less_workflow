@@ -9,3 +9,7 @@ guide_stars*.csv
 *B_N.fits
 *B_S.fits
 .ipynb_checkpoints/
+BlankXMLTemplate.xml
+obstemp.dat
+progtemp.dat
+__pycache__/

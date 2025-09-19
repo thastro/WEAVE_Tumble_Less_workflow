@@ -1,0 +1,27 @@
+Stage 3
+=======
+
+**Contributors:** David Murphy, Luis Peralta
+
+Input and output
+----------------
+
+* **Input:**
+
+  + A set of IFU XML files with the targets to be used as central fibres
+    included.
+
+* **Output:**
+
+  + A set of IFU XML files with the targets to be used as central fibres
+    included, plus their corresponding guide and calib stars.
+
+
+Software
+--------
+
+* *add_guide_and_calib_stars.py*:
+
+  A Python script/function for adding guide and calib stars to IFU XML files
+  (already populated with the targets to be used as central fibres).
+

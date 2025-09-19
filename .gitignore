@@ -1,0 +1,10 @@
+resources/WG/
+xmls/
+tl_coverage*.csv
+central_target_list*.csv
+guide_stars*.csv
+*.png
+*A_N.fits
+*A_S.fits
+*B_N.fits
+*B_S.fits

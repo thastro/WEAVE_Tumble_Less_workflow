@@ -1,0 +1,240 @@
+Documentation for IFU workflow
+==============================
+
+*v. 20230202*
+
+This document details the workflow shown in the relevant html file
+included within this repository. Please use this guide in conjunction
+with the html file. Hyperlinks therein (depicted as globes) provide
+access to the resources described here.
+
+Bitbucket does not render the html in-page. You can use the following link
+to quickly access to a mirror (which eventually could *not* be synched with
+the latest version of any branch of this repository):
+
+http://casu.ast.cam.ac.uk/~dmurphy/weave/ifu_workflow/ifu_workflow.html
+
+**Installation:** please refer to the TUTORIAL.md file for installation
+instuctions.
+
+**Please note:** during development, not all resources are available, and
+links will be generated when sample files, code is committed.
+
+**Disclaimer:** this software is designed to aide in the preparation of
+WEAVE IFU observations. We provide no warranty for this software, and
+offer support on a best-effort basis.
+
+**Definitions:**
+
+* CNAME: an identifier that maps to sky position. Used to identify WEAVE targets.
+* End-user: the user that is preparing IFU observations
+* OR: the WEAVE Operational Repository - http://casu.ast.cam.ac.uk/weave/
+* SPA-columns: the mandatory WEAVE SPA columns that must be included in all input FITS catalogues
+* WASP: the WEAVE Automated Submission Platform - http://wasp.ast.cam.ac.uk/
+
+Stage 0: Target selection
+-------------------------
+
+The end-user must compile an initial list of IFU
+targets. Consideration must be made of the instrument mode the
+observations are made in, what dither strategy is to be used, what
+targets are to be provided.
+
+We suggest defining the survey itself, and the planned targets in a CSV
+file - an example pair of CSVs can be found in workflow/stage1/input. Users
+can copy these and adapt to their own needs.
+
+Please read the comments in these 2 CSV files to usage instructions. Users
+need to supply their TACALLOC and TAC_ID codes. These can be found in the
+WASP under the "My Survey" page.
+
+Stage 1: Creation of IFU driver catalogue
+-----------------------------------------
+
+**Contributors:** David Murphy, Luis Peralta
+
+The information from stage 0 needs to be standardised into a
+preliminary FITS catalogue containing "IFU drivers": IFU target
+positions in each row alongside other critical columns that need to be
+propagated through into the XML-based OB files. The example data in
+stage1 provides a template for what quantities must be included, but
+should ideally encompass specific SPA-columns required for assembling
+the XML files.
+
+Stage 2: Creation of the XML files with the targets
+---------------------------------------------------
+
+**Contributors:** David Murphy, Luis Peralta
+
+The code at stage 2 analyses the input IFU driver catalogue and
+converts this list into a series of distinct pointings (grouping mIFU
+pointings into fields where required). This process outputs the
+pointings as XML files (using the base XML template), filling the
+details as interpreted from the PROGTEMP and OBSTEMP codes. For
+instances where users provide more candidate bundles than can be
+accommodated per WEAVE mIFU field (generally 18 or 19), then the
+bundles are distributed depending on one of three options set by
+the user.
+
+
+Stage 3: Adding guide and calibration stars to the XML files
+------------------------------------------------------------
+
+**Contributors:** David Murphy, Luis Peralta
+
+Each XML file is further developed by injecting the non-science target
+information. This includes addition of the guidestar(s) for the LIFU
+(mIFU) as well as calibration target options (more than one, to allow
+for flexibility when allocating mIFU bundles). The selection of a
+guidestar for LIFU also sets the required position angle (PA) at this
+point. Users had the option to specify a requested PA at stage 1 and
+determine if this is permitted based on availability of a suitable
+guiding candidate. For LIFU pointings with specified preset dither
+patterns (LIFU_1.xml in the stage3 example data), we require that the
+selected guidestar be visible in each dither. In principle for a custom
+dither pattern (LIFU_2.xml) end-users are able to specify a guide star
+for each pointing. We recommend LIFU xmls use the same guide star for
+each exposure. The output of this stage are XML files ready to be passed
+to Configure.
+
+Stage 4: Configuring the XML files
+----------------------------------
+
+**Contributors:** David Terrett
+
+End-users are required to have a copy of Configure tools installed and
+running for this stage. XML files are passed to the Configure
+tools. In LIFU and mIFU cases, the files generated at Stage 2 have
+associated .epoch and .ha files - these can be provided (as pipe inputs)
+to Configure for providing it information on the epoch and desired hour
+angle of observation.
+
+For LIFU observations, Configure serves solely to populate the XML
+with the LIFU array, including correct positions for the fibres. For
+the mIFU, Configure involves a more interactive method of dropping mIFU
+bundles onto input targets. The location of the sky mIFU bundles is
+chosen at this stage. Configure then calculates the bundle rotation
+and consequently fibre positions. For the mIFU, this can be an
+iterative process, whereby un-allocated targets may be re-submitted
+to Configure in order to generate a new XML file (and hence
+observation) with these additional targets. For both IFU modes, where
+required Configure will implement the pre-set dither pattern. This is
+controlled by the apply_dither' attribute in the <dithering> element,
+which in turn is inherited from the ifu_dither column in stage 0
+catalogue.
+
+Stage 5: Creation the IFU FITS catalogue
+----------------------------------------
+
+**Contributors:** David Murphy, Luis Peralta
+
+The output of configure (previous stage) provides spatial data for all
+fibres, at all dither positions. The workflow now takes these data and
+converts each fibre into a row of a FITS file defined by the input
+FITS catalogue template for that survey. This template will include
+(as-yet empty) survey-specific columns and photometric data columns
+to be added later.
+
+Stage 6: Improving the IFU FITS catalogue (optional, but recommended)
+---------------------------------------------------------------------
+
+**Contributors:** Luis Peralta, Yago Ascasibar, Scott Trager
+
+This code collection takes the stage 5 FITS catalogue and populates
+all relevant missing columns. These fall into 3 categories:
+
+* Photometric data: MAG_*, MAG_*_ERR, GAIA_MAG_* and GAIA_MAG_*_ERR.
+  Using valid input imaging, this module calculates the expected
+  magnitude through the fibre.
+
+* Additional fibre information: TARGUSE, TARGCLASS and APS_*.
+  Linked to the previous module, users may set specific priors on
+  specific fibres. Examples include designating additional fibres
+  within the LIFU array as sky (TARGUSE=S), assigning TARGCLASS
+  values to fibres, and adjusting the APS analysis parameters for
+  sources observed with particular fibres.
+
+* The inclusion of survey-specific ancillary data. We provide a
+  framework code here that end-users will need to adapt to include
+  their additional data.
+
+Stage 7: Creation of the combo FITS catalogue
+---------------------------------------------
+
+**Contributors:** David Murphy, Luis Peralta
+
+The output of Stage 6 can now be merged with the equivalent MOS-based
+catalogue. In any given submission round, each survey must submit just
+one FITS file to the WASP for validation. This stage therefore concatenates
+the MOS and IFU-based targets. This requires that the MOS
+catalogue contains (as per template specification) the same columns,
+and that these are populated and ready for WASP validation. WASP will
+allow advance validation of these two components via the test channel,
+to ensure that (for example) the MOS targets are legal prior to the
+merge.
+
+This stage should still be run, even if there is no MOS catalogue to merge
+with (in which case the catalogue can be left as None). This is because this
+stage also filters out calibration and sky mIFU bundles that do not need to
+be stored in the FITS catalogue (unless special processing requests have been
+specified for them).
+
+Stage 8: Submission to WASP of the combo FITS catalogue
+-------------------------------------------------------
+
+**Contributors:** David Murphy, Clare Worley
+
+The combo FITS file is submitted to WASP for validation.
+After WASP has validated the combined FITS catalogue, a copy of the
+validated file is available to download from the WASP. This is the
+version that has CASU-generated CNAMES. The WEAVE Survey Working Group
+(SWG) takes these files to prepare MOS Observing Blocks.
+
+Stage 9: Finishing the XML files
+--------------------------------
+
+**Contributors:** Luis Peralta, Sarah Hughes, David Murphy
+
+End-users for the IFU workflow also take the WASP-validated FITS
+catalogue and generate XML OB files. The code collection in stage 9
+takes the output from the WASP validation and combines it with the
+**input** to stage 5 (ie, the output of Configure) to generate
+WEAVE-ready OBs. These will include all relevant quantities specified
+at stage 6 in addition to CNAMES from the FITS catalogue.
+
+It is known that this process can be time-consuming where there are a
+large number of FITS rows (often due to a large number of OBs and dither
+pointings). A multi-processing option is provided to improve processing
+times.
+
+Once these candidate OBs have been generated, some may require linking
+such that the scheduler can connect observation of one field with the
+observation of another distinct field. We demonstrate this here by
+providing an example linking CSV file. This allows the user to define
+group linkages between the OBs (via linked_group or obsgroup) subject to
+some constraints and limitations. Please check the stage9 README and the
+example stage9 input file for information and examples of this process.
+
+Stage 10: Submission to WASP of the XML files
+---------------------------------------------
+
+**Contributors:** David Murphy, Clare Worley
+
+Once the XML files in stage 9 have been generated, end-users must
+wait until WASP opens for OB submissions for this round. Users will
+receive an email notification when this window opens, but validation
+of these files ahead of this window can be checked via the test
+channel open to all WASP users. Bulk submission of these files can be
+done by generating a tarball and submitting this to the WASP, as per
+instructions. For OB submissions, WASP permits incremental uploads of
+(for example) MOS-only fields followed by IFU-only fields.
+
+Stage 11: Happy ending
+----------------------
+
+Once your XML IFU submissions have been successfully validated, the
+WASP adds CNAMES to any sky fibres that do not have CNAME data. Your
+targets are now prepared for observations at WHT - congratulations!
+You can check the progress of your observations at the WEAVE
+Operational Repository (OR).
+

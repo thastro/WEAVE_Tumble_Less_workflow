@@ -1,0 +1,110 @@
+PROGTEMP, OBSTEMP, TARGNAME, TARGID, IFU_DITHER, TAC_ID, GAIA_RA, GAIA_DEC, HA_REQUEST, HA_RANGE, IFU_PA_REQUEST
+#
+# Column description:
+#
+#   This is a list of columns that may be defined in the target definition. Please note that the
+#   order presented below is informational. Users can define their own order according to the first
+#   line of this file. We adopt the above order to allow for easy assembly of linking group keys in stage9
+#
+# - TARGID:         Internal, survey-specific ID
+# - TARGNAME:       Common name of the target
+# - TAC_ID:         The TAC ID this OB is observed under
+#                   (WEAVE surveys: this should be set as 'WS'
+#		    in the _params.csv and then left as an empty entry)
+# - GAIA_RA:        Right ascension
+# - GAIA_DEC:       Declination
+#
+# - PROGTEMP:       Instrument configuration
+# - OBSTEMP:        Observing constraints
+# - IFU_DITHER:     Dither pattern
+# - IFU_PA_REQUEST: Requested position angle (may not be honored)
+# - HA_REQUEST:     Hour angle to configure the field for
+# - HA_RANGE:       Preferred HA range to observe target over
+#
+# - TARGSRVY:       WEAVE Survey
+# - TARGPROG:       Specific programme
+# - TARGCLASS:      STAR/GALAXY/...
+# - TARGPRIO:       Internal priority
+#
+# - GAIA_DR:        Gaia Data Release
+# - GAIA_EPOCH:     Reference frame epoch
+# - GAIA_PMRA:      Proper motion (RA)
+# - GAIA_PMDEC:     Proper motion (DEC)
+# - GAIA_PARAL:     Parallax
+#
+# Note: If all the entries in certain columns are identical for all
+#       targets, it is not compulsory that they are explicitly
+#       listed here. You can instead remove reference to them in the
+#	1st line of this file. Their values will then be taken from the
+#	defined default values in the parameter file `<base_name>_params.csv`
+#
+#       Alternatively, you can leave the value empty in the target definitions
+#	below - for example reverting to the params.csv default for value3:
+#	value1, value2, , value 4
+#
+# The following are a series of example target definitions. Where useful, we include
+# information describing the usage for each case.
+#
+# A LIFU pointing using default values for the final 4 columns (IFU_DITHER, HA_REQUEST, HA_RANGE, IFU_PA_REQUEST)
+41331, IAEEB, PSZ1_125A, PSZ1_125A, , WS, 316.369609537, -4.71060356792, , ,
+# 
+# A -3-dither LIFU pointing, this time specifying the configuration HA and HA range
+41331, IAEEB, PSZ1_125A, PSZ1_125A, -3, WS, 316.369609537, -4.71060356792, 2.75, 2.0,
+# 
+# A 6-dither HR LIFU pointing with +/-1h hour angle observing range to observe at HA=+2h and PA=0
+53331, IAEEB, PSZ1_125A, PSZ1_130A, 6, WS, 316.369609537, -4.71060356792, 1.0, 2.0, 0.0
+# 
+# A custom 3-dither pattern LIFU pointing
+41331, IAEEB, PSZ1_125A, PSZ1_125A, -1, WS, 316.369609537, -4.71060356792, 0.0, 2.0,
+41331, IAEEB, PSZ1_125A, PSZ1_125A, -1, WS, 316.369058752, -4.70967250147, 0.0, 2.0,
+41331, IAEEB, PSZ1_125A, PSZ1_125A, -1, WS, 316.370143237, -4.70966298315, 0.0, 2.0,
+
+# 
+# A set of mIFU targets under a 3-dither pattern. 3 is the default, so no need to specify here
+71331, IAEEB, CLUSTER1, PGC_91697, , WS, 316.9558, -5.3525, , ,
+71331, IAEEB, CLUSTER1, PGC_65950, , WS, 315.5608, -5.1131, , ,
+71331, IAEEB, CLUSTER1, PGC_1051614, , WS, 315.9079, -4.9278, , ,
+71331, IAEEB, CLUSTER1, PGC_1048686, , WS, 315.8575, -5.1475, , ,
+71331, IAEEB, CLUSTER1, PGC_1058689, , WS, 315.67, -4.4014, , ,
+71331, IAEEB, CLUSTER1, PGC_1044404, , WS, 316.6396, -5.4644, , ,
+71331, IAEEB, CLUSTER1, PGC_1045221, , WS, 316.2858, -5.4, , ,
+71331, IAEEB, CLUSTER1, PGC_1054814, , WS, 316.7646, -4.6878, , ,
+71331, IAEEB, CLUSTER1, PGC_1041786, , WS, 316.3958, -5.6722, , ,
+71331, IAEEB, CLUSTER1, PGC_1048019, , WS, 316.705, -5.1933, , ,
+71331, IAEEB, CLUSTER1, PGC_1065694, , WS, 316.5483, -3.8808, , ,
+71331, IAEEB, CLUSTER1, PGC_1051735, , WS, 316.7125, -4.9186, , ,
+71331, IAEEB, CLUSTER1, PGC_1053791, , WS, 316.4896, -4.7664, , ,
+71331, IAEEB, CLUSTER1, PGC_1060024, , WS, 316.1362, -4.3089, , ,
+71331, IAEEB, CLUSTER1, PGC_1059931, , WS, 316.9229, -4.315, , ,
+71331, IAEEB, CLUSTER1, PGC_1063030, , WS, 315.6946, -4.0897, , ,
+71331, IAEEB, CLUSTER1, PGC_1053595, , WS, 316.9179, -4.7797, , ,
+71331, IAEEB, CLUSTER1, PGC_1055624, , WS, 316.0612, -4.6247, , ,
+71331, IAEEB, CLUSTER1, PGC_1049654, , WS, 316.7354, -5.0761, , ,
+71331, IAEEB, CLUSTER1, PGC_1060631, , WS, 316.2367, -4.2647, , ,
+71331, IAEEB, CLUSTER1, PGC_1058049, , WS, 316.5967, -4.4497, , ,
+71331, IAEEB, CLUSTER1, PGC_1056295, , WS, 316.9825, -4.5789, , ,
+# 
+# A set of the same mIFU targets with 6-dither pattern
+71661, IAEEB, CLUSTER1, PGC_91697, 6, WS, 316.9558, -5.3525, , , 
+71661, IAEEB, CLUSTER1, PGC_65950, 6, WS, 315.5608, -5.1131, , , 
+71661, IAEEB, CLUSTER1, PGC_1051614, 6, WS, 315.9079, -4.9278, , , 
+71661, IAEEB, CLUSTER1, PGC_1048686, 6, WS, 315.8575, -5.1475, , , 
+71661, IAEEB, CLUSTER1, PGC_1058689, 6, WS, 315.67, -4.4014, , , 
+71661, IAEEB, CLUSTER1, PGC_1044404, 6, WS, 316.6396, -5.4644, , , 
+71661, IAEEB, CLUSTER1, PGC_1045221, 6, WS, 316.2858, -5.4, , , 
+71661, IAEEB, CLUSTER1, PGC_1054814, 6, WS, 316.7646, -4.6878, , , 
+71661, IAEEB, CLUSTER1, PGC_1041786, 6, WS, 316.3958, -5.6722, , , 
+71661, IAEEB, CLUSTER1, PGC_1048019, 6, WS, 316.705, -5.1933, , , 
+71661, IAEEB, CLUSTER1, PGC_1065694, 6, WS, 316.5483, -3.8808, , , 
+71661, IAEEB, CLUSTER1, PGC_1051735, 6, WS, 316.7125, -4.9186, , , 
+71661, IAEEB, CLUSTER1, PGC_1053791, 6, WS, 316.4896, -4.7664, , , 
+71661, IAEEB, CLUSTER1, PGC_1060024, 6, WS, 316.1362, -4.3089, , , 
+71661, IAEEB, CLUSTER1, PGC_1059931, 6, WS, 316.9229, -4.315, , , 
+71661, IAEEB, CLUSTER1, PGC_1063030, 6, WS, 315.6946, -4.0897, , , 
+71661, IAEEB, CLUSTER1, PGC_1053595, 6, WS, 316.9179, -4.7797, , , 
+71661, IAEEB, CLUSTER1, PGC_1055624, 6, WS, 316.0612, -4.6247, , , 
+71661, IAEEB, CLUSTER1, PGC_1049654, 6, WS, 316.7354, -5.0761, , , 
+71661, IAEEB, CLUSTER1, PGC_1060631, 6, WS, 316.2367, -4.2647, , , 
+71661, IAEEB, CLUSTER1, PGC_1058049, 6, WS, 316.5967, -4.4497, , , 
+71661, IAEEB, CLUSTER1, PGC_1056295, 6, WS, 316.9825, -4.5789, , ,
+

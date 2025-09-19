@@ -1,0 +1,45 @@
+parameter, value
+#
+# Compulsory parameters:
+#
+PI_first_name, "Anon"
+PI_surname, "Person"
+catauthor_name, "Anon Person"
+catauthor_email, "anon@user.com"
+cc_report, "anon_friend@user.com"
+trimester, "2023A1"
+report_verbosity, "1"
+GAIA_DR, 3
+TACALLOC, None
+#
+# Default values for catalogue columns on the target list:
+# (optional; see note in `<base_name>_target_list.csv`)
+# 
+# Note: Please be sure to provide the correct TACALLOC
+#       and TAC_ID values. These can be found under
+#       the WASP:
+#
+#       wasp.ast.cam.ac.uk/mysurvey
+#
+#       For WEAVE surveys, these values should be:
+#       TACALLOC, None
+#       TAC_ID, 'WS'
+#
+#       For Open Time surveys, TAC_ID should reflect the
+#       time with which you wish to observe each target.
+#       In some cases, you may have >1 TAC_ID
+TARGSRVY, "WC"
+TARGPROG, "LR"
+TARGCLASS, "GALAXY"
+TAC_ID, "WS"
+PROGTEMP, "41331"
+OBSTEMP, "NBCEC"
+IFU_DITHER, 3
+TARGPRIO, 10.0
+GAIA_EPOCH, 2016.0
+GAIA_PMRA, 0.0
+GAIA_PMDEC, 0.0
+GAIA_PARAL, 0.0
+IFU_PA_REQUEST, nan
+HA_RANGE, 2.0
+HA_REQUEST, 0.0

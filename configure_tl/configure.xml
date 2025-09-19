@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This is the configuration file for configure, lifu_configure and dither.
+
+  The default behaviour of these programs is to read a copy embedded in
+  the executables as a Qt resource.
+-->
+<configure datamver="8.00">
+  <!--
+    The configure version number. This must match the version number embedded
+    in the code (defined in pos/positioner/poslib/Version.cpp).
+  -->
+  <configure_version>4.1.0</configure_version>
+
+  <!--
+    Epoch of automatic targets
+  -->
+  <default_epoch>2016.0</default_epoch>
+
+  <telescope>
+    <!--
+      The longitude, latitude and height above mean sea level (in metres) of
+      the WHT
+    -->
+    <east_longitude>-17.881639</east_longitude>
+    <latitude>28.760583</latitude>
+    <height>2332.0</height>
+    <!---
+      Elevation below which we stop trying to do refraction calculations
+      (degrees).
+    -->
+    <horizon_limit>5.0</horizon_limit>
+    <!--
+      The path to the file that defines the mapping between the sky and the
+      focal plane (i.e. the optical distortion). The leading ":" denotes a
+      Qt resource.
+    -->
+    <focal_plane_map>:/focal_plane_map.xml</focal_plane_map>
+    <!--
+      The limits on the motion of the WEAVE rotator (in degrees).
+    -->
+    <rotator_low_limit>-155.0</rotator_low_limit>
+    <rotator_high_limit>155.0</rotator_high_limit>
+    <!--
+      The rotator angle (in degrees) centred on the range of angles that
+      gives the best image quality (because it mimimises the tilt of the plate
+      in the focal plane).
+    -->
+    <optimum_rotator_angle>
+      <plate_a>-25.0</plate_a>
+      <plate_b>25.0</plate_b>
+    </optimum_rotator_angle>
+    <!--
+      The offset (in degrees) between parallactic angle and rotator angle
+      when the field position angle is zero such that:
+
+          rotator angle = offset - parallactic angle
+    -->
+    <rotator_offset>0.0</rotator_offset>
+  </telescope>
+
+  <!--
+    The path to the plate files. The leading ":" denotes a Qt resource.
+  -->
+  <plate_a_definition>:/PLATE_A.xml</plate_a_definition>
+  <plate_b_definition>:/PLATE_B.xml</plate_b_definition>
+  <lifu_definition>:/LIFU.xml</lifu_definition>
+
+  <!--
+    The dither patterns for the mini-IFUs.
+
+    The coordinates are offsets of the telescope in arcsec along the
+    x and y axes of the positioner. When the field is at position angle
+    zero, the y axis points North and the x axis points East.
+  -->
+  <mifu_dither>
+    <pattern_3>
+      <x>0.0000 0.0000 -0.9208</x>
+      <y>0.0000 1.0632  0.5316</y>
+    </pattern_3>
+    <pattern_4>
+      <x>0.0000 0.0000 -0.9208 0.9208</x>
+      <y>0.0000 1.0632  0.5316 0.5316</y>
+    </pattern_4>
+    <pattern_5>
+      <x>0.0000 0.0000 -0.9208 0.9208  0.9208</x>
+      <y>0.0000 1.0632  0.5316 0.5316 -0.5316</y>
+    </pattern_5>
+    <pattern_6>
+      <x>0.0000 0.0000 -0.9208 0.9208  0.9208  0.0000</x>
+      <y>0.0000 1.0632  0.5316 0.5316 -0.5316 -1.0632</y>
+    </pattern_6>
+    <pattern_-3>
+      <x>0.9208  0.9208  0.0000</x>
+      <y>0.5316 -0.5316 -1.0632</y>
+    </pattern_-3>
+  </mifu_dither>
+
+  <!--
+    The dither patterns for the Large IFU
+  -->
+  <lifu_dither>
+    <pattern_3>
+      <x>0.0000 -1.9494 -0.9747</x>
+      <y>0.0000  0.0000 -1.6882</y>
+    </pattern_3>
+    <pattern_4>
+      <x>0.0000 -1.9494 -0.9747 -0.9747</x>
+      <y>0.0000  0.0000 -1.6882  1.6882</y>
+    </pattern_4>
+    <pattern_5>
+      <x>0.0000 -1.9494 -0.9747 -0.9747 0.9747</x>
+      <y>0.0000  0.0000 -1.6882  1.6882 1.6882</y>
+    </pattern_5>
+    <pattern_6>
+      <x>0.0000 -1.9494 -0.9747 -0.9747 0.9747 -2.9240</x>
+      <y>0.0000  0.0000 -1.6882  1.6882 1.6882  1.6882</y>
+    </pattern_6>
+    <pattern_-3>
+      <x>-0.9747 0.9747 -2.9240</x>
+      <y>1.6882  1.6882  1.6882</y>
+    </pattern_-3>
+  </lifu_dither>
+</configure>

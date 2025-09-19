@@ -1,0 +1,115 @@
+Stage 9
+=======
+
+**Contributors:** Luis Peralta, Sarah Hughes, David Murphy
+
+Input and output
+----------------
+
+* **Input:**
+
+  + A validated and CNAME'd FITS catalogue by WASP.
+
+  + A set of configured IFU XML files of one specific survey or PI proposal
+    (i.e. the input files for stage 5).
+  
+* **Auxiliar files:**
+  + *linking.csv*:
+  A CSV file containing the KEYS, LINKING_MODE, GROUP_ID and SEED_VALUES needed 
+  to insert grouping attributes into the observation element of matching xml files
+
+* **Output:**
+
+  + A set of configured IFU XML files of one specific survey or PI proposal
+    with CNAMEs and the additional target information updated/added at stage 6,
+    plus some values populated by hand.
+
+    If linking is enabled this modifies the linking attributes 
+    within the xml files observation element. 
+    If linking is not enabled these attributes are empty strings.
+
+Software
+--------
+
+* *fill_xmls_with_fits_info.py*:
+
+  A Python script to populate a set of IFU XML files with the target information taken
+  from a CNAME'd FITS catalogue.
+
+  The linking observation elements of the xml file are set to empty strings.
+
+
+Extra software
+-------------------
+
+  + Automated Linking software
+
+
+* **Input**:
+
+* CSV file
+
+  + The linking CSV file uses the following structure (case sensitive):
+
+  | KEY | LINKING_MODE | GROUP_ID | SEED_VALUE |
+  | -------- | -------- | -------- |  -------- |
+  | progtemp:obs_temp:targname:targid:ifu_dither | L or O | Str |  Int |
+
+  When a linking.csv file is supplied, the formatting is checked to ensure it follows this structure and will fail before any xml files are opened. Additional checks are made as the linking process takes place.
+
+* **Output**:
+
+* The following information is printed at the end of the linking process:
+  + File Ledger
+  This tracks the number of links found within each xml file. 
+
+  + matching keys
+  The list of possible keys that were found within each xml file that could be linked too.
+
+  **IMPORTANT NOTE: This printing statment does not state the final linking attributes which were inserted into the file, only those that were connected to each xml file.**
+
+* **Implementation**:
+The command line argument --groups should be added in stage9 followed by the linking.csv directory 
+
+  + (Optional) The --strict command line option prevents multiple groups being matched to the same file.
+
+* **General Rules**:
++ No duplicate keys allowed per LINKING_MODE. This logs a warning to the user to say that duplicate keys have been found in the file and then hits an assertion as the process begins.
++ Asserts that a KEY must have a length of five components when split by ':'
++ Asserts LINKING_MODE is either 'L' or 'O'
++ Asserts SEED_VALUES must be an integer value
++ Asserts that the same GROUP_ID per LINKING_MODE cannot have varying SEED_VALUES. This is checked as part of the linking process not in the initial CSV file check.
+
+If the --strict argument is used, an additional assertion is added:
++ Multiple groups per LINKING_MODE cannot be applied to an xml file
+
+* **Overview**:
+
+The main processing happens in the *process_xml_file* function. By default this function now clears the linking attributes to be empty strings, regardless of whether any linking file is supplied.
+
+The function uses the following search criteria to identify potential target keys in each xml file:
++ For the LIFU: the first field element for the target with the 'C14' string in the ifu_spaxel attribute. 
+
++ For the mIFU: the first field element for any string with a value of 'MXXC04' where XX takes a value \[01, 20] in the ifu_spaxel attribute.
+
+If a match is found in the target attribute then the *targname* and *targid* elements are extracted and a string is formed of PROGTEMP:OBSTEMP:TARGNAME:TARGID:IFU_DITHER.
+In this case the 'applied dither' attribute is used as IFU_DITHER for cross-matching.
+
+The linking information is tracked through a grouping ledger that keeps records of group linking etc.
+
+  * **Behaviour**:
+
+    + If no matches are found for any of the CSV file KEY's, this information is printed to the terminal and the file is written out with the linking attributes as empty strings.
+
+    + Only one linking group can be applied per LINKING_MODE to each xml_file.
+
+    + If --strict is enabled:
+      Multiple groups cannot be found within the same xml file.
+
+    + If strict is not enabled:
+      The most dominant group in a file per LINKING_MODE is selected and inserted into the observation element (i.e. the group where the highest number of targets in the file occurrs).
+      In the case of a tie between dominant groups (i.e multiple groups have the same number of targets in a file) the following behaviour occurs:
+        + For (L)inked_group -> the group with the highest SEED_VALUE is chosen.
+        + For (O)bs_group -> the group with the lowest SEED_VALUE is chosen.
+
+We provide a report at the end of the linking process, drawing on data from the ledger.

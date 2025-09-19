@@ -1,0 +1,39 @@
+Stage 2
+=======
+
+**Contributors:** David Murphy, Luis Peralta
+
+Input, auxiliar files and output
+--------------------------------
+
+* **Input:**
+
+  + An *IFU driver catalogue*.
+
+* **Auxiliar files:**
+
+  + *aux/BlankXMLTemplate.xml* (optional):
+    A blank template for XML files which describe WEAVE observing blocks.
+
+  + *aux/obstemp.dat* (optional):
+    A file with the required information to interpret an OBSTEMP value (it will
+    be automatically retrieved if not present).
+
+  + *aux/progtemp.dat* (optional):
+    A file with the required information to interpret a PROGTEMP value (it will
+    be automatically retrieved if not present).
+
+* **Output:**
+
+  + A set of IFU XML files with the targets to be used as central fibres
+    included.
+
+
+Software
+--------
+
+* *create_xml_files.py*:
+
+  A Python script/function for creating IFU XML files from an *IFU driver
+  catalogue*.
+

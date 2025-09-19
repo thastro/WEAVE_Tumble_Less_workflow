@@ -1,0 +1,25 @@
+Stage 7
+=======
+
+**Contributors:** David Murphy, Luis Peralta
+
+Input and output
+----------------
+
+* **Input:**
+
+  + A fully-populated MOS FITS catalogue.
+  + A fully-populated IFU FITS catalogue.
+
+* **Output:**
+
+  + A combo FITS catalogue.
+
+
+Software
+--------
+
+* *create_combo_fits_cat.py*:
+
+  A Python script/function to create a combo FITS catalogue.
+

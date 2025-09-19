@@ -1,0 +1,61 @@
+Stage 4
+=======
+
+**Contributors:** David Terrett, David Murphy
+
+Input, auxiliar files and output
+--------------------------------
+
+* **Input:**
+
+  + A set of IFU XML files with the targets to be used as central fibres
+    included, plus their corresponding guide and calib stars.
+
+* **Auxiliar files:**
+
+  Several auxiliar files are used in this stage. They are described in the
+  documentation of the configure tools.
+
+* **Output:**
+
+  + A set of configured (and dithered) IFU XML files.
+
+
+Software
+--------
+
+* *configure_and_dither.py*:
+  A set of Python functions that handle the I/O for running configure and dither
+  on the provided XML files. This requires that a version of configure is installed,
+  and that the user has either installed it in the default location (MacOS) or has
+  provided via switch the directory where it is installed.
+
+* *postproc.py*:
+  Some functions used for post-processing Configure output whilst development is
+  still in progress. We aim to deactiveate these when in production.
+  
+The following software is not distributed in the IFU repository:
+
+* *xmllint*:
+  A tool for formatting the output of the XMLs - particularly useful for standardising
+  the attribute order in the XMLs to make reading / comparing them easier. If you do
+  not have this installed, you can run configure_and_dither.py with the --nolint switch.
+
+* *configure*:
+
+  The main configure tool, which is used for configuring MOS and mIFU fields for
+  WEAVE observations.
+
+* *lifu_configure*:
+
+  A configure tool used for "configuring" LIFU fields for WEAVE observations.
+
+* *dither*:
+
+  A configure tool used for dithering IFU configured fields.
+
+The sources of this software are avalaible in *pos* repo at ING Bitbucket
+( https://ingbitbucket.ing.iac.es/projects/WVPOS/repos/pos/browse ), while
+compiled files are distributed using a page at ING Confluence
+( https://ingconfluence.ing.iac.es:8444/confluence/x/woZM ).
+

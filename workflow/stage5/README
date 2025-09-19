@@ -1,0 +1,32 @@
+Stage 5
+=======
+
+**Contributors:** David Murphy, Luis Peralta
+
+Input, auxiliar files and output
+--------------------------------
+
+* **Input:**
+
+  + A set of configured (and dithered) IFU XML files of one specific survey or
+    PI proposal.
+
+* **Auxiliar files:**
+
+  + *aux/&ast;_CatalogueTemplate.fits*:
+    A template with the structure of the FITS catalogue of one specific survey
+    or PI proposal.
+
+* **Output:**
+
+  + An IFU FITS catalogue populated with the information available in the input
+    XML files.
+
+
+Software
+--------
+
+* *create_ifu_fits_cat.py*:
+
+  A Python script/function to create an IFU FITS catalogue.
+

@@ -1,0 +1,1 @@
+../stage9/fill_xmls_with_fits_info.py

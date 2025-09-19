@@ -1,0 +1,353 @@
+{
+    "1": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 120,
+		"red": 10
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 9,
+		"red": 3
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "2": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 250,
+		"red": 200
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 150,
+		"red": 15
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "3": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 200,
+		"red": 200
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 60,
+		"red": 15
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "4": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 25,
+		"red": 9
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 3,
+		"red": 1
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": 1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 10,
+		"red": 2
+	    }
+	}
+    },
+    "5": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 120,
+		"red": 120
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 90,
+		"red": 7
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "6": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 180,
+		"red": 120
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 25,
+		"red": 7
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "7": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 250,
+		"red": 3
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 8,
+		"red": 2
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "8": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 250,
+		"red": 200
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 150,
+		"red": 15
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    },
+    "9": {
+	"arc": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": 200,
+		"red": 200
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"cal_lamp_filter_B": "EMPTY",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	},
+	"fibre_lampflat": {
+	    "1": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": 60,
+		"red": 15
+	    },
+	    "2": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    },
+	    "4": {
+		"cal_lamp_filter_A": "WCALU_clear1",
+		"blue": -1.0,
+		"red": -1.0
+	    }
+	}
+    }
+}

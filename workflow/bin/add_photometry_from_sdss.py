@@ -1,0 +1,1 @@
+../stage6/add_photometry_from_sdss.py

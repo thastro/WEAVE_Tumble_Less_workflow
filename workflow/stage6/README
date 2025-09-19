@@ -1,0 +1,46 @@
+Stage 6
+=======
+
+**Contributors:** Luis Peralta, Yago Ascasibar, Scott Trager
+
+Input, auxiliar files and output
+--------------------------------
+
+* **Input:**
+
+  + An IFU FITS catalogue populated with the information available in the XML
+    files created with configure.
+
+* **Output:**
+
+  + A fully-populated IFU FITS catalogue.
+
+
+Software
+--------
+
+* *check_populated_ifu_fits_cat.py*:
+
+  A Python script/function to check a fully-populated FITS catalogue versus a
+  non-populated version. It allows to detect potential undesired changes
+  produced at this stage.
+
+* *add_photometry_from_ps.py*:
+
+  A Python script/function to download and photometer PanSTARRS1 *gri* FITS
+  images to provide integrated-fibre photometry for each fibre in a
+  configuration.
+
+* *add_photometry_from_sdss.py*:
+
+  A Python script/function to add SDSS photometry to an IFU FITS catalogue.
+
+* *mark_star_fibres.py*:
+
+  A Python script/function to mark Gaia eDR3 stars in a IFU FITS catalogue.
+
+* *populate_column_based_on_targid.py*:
+
+  A Python script/function to populate a column depending on the corresponding
+  TARGID values.
+

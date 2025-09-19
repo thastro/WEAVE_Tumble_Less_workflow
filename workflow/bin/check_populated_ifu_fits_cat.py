@@ -1,0 +1,1 @@
+../stage6/check_populated_ifu_fits_cat.py

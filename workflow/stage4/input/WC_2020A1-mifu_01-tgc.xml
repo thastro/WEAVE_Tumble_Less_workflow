@@ -1,0 +1,1041 @@
+<?xml version="1.0" encoding="utf-8"?>
+<weave author="a@domain.com" cc_report="b@domain.com,c@domain.com" datamver="8.00" report_verbosity="1">
+  <!--
+      Detailed documentation for this file is available in:
+        - WEAVE-ICD-025 "Configure XML Definition"
+        - WEAVE-ICD-030 "WEAVE SPA to SWG & QAG ICD"
+      These files can be obtained from the WEAVE Operational Repository:
+        http://casu.ast.cam.ac.uk/weave/
+      Please consult these documents BEFORE requesting assistance.
+      This file represents a blank XML template (WEAVE data model
+      version indicated in <weave> as datamver) that is ready to be
+      filled with:
+        1. Instrument configuration information
+        2. Field observing constraints appropriate to either...
+        3a. ...targets from "protofield" FITS files containing
+            ~1500-2000 targets (for MOS; run through Configure)
+        3b. ...insertion of a populated IFU array containing 640 fibers
+            and one guide star (for LIFU)
+        3c. ..."driver targets" for assiging fibre bundles to targets
+            (for mIFU; run through Configure)
+      Tools to generate appropriate instrument configuration (PROGTEMP)
+      code and observational constraint (OBSTEMP) codes can be found at
+      the WEAVE Automated Submission Platform (WASP):
+        http://wasp.ast.cam.ac.uk
+      This XML file must be submitted to the WASP for validation prior
+      to observation.
+      The author's email address should be added to the "author"
+      attribute of the <weave> element, along with any additional email
+      addresses for those requiring WASP validation reports in the
+      "cc_report" attribute. Please choose the verbosity level of the
+      WASP report in the "report_verbosity" attribute.
+  -->
+  <programme>
+    <!--
+        Each XML Observing Block has a PROGTEMP value, which defines
+        how the instrument is configured. Please bear in mind the
+        "NORBI.X" mnemonic for PROGTEMP codes:
+          PROGTEMP = "NORBI.X(+)"
+            N = I(N)strument configuration
+            O = (O)B length
+            R = (R)ed arm exposure code
+            B = (B)lue arm exposure code
+            I = B(I)nning in the spectral direction
+            X(+) = Clone this XML Observing Block (X) times.
+                   Follow this with a "+" to chain these cloned OBs so
+                   that completion of one in the chain boosts the
+                   weights (within a survey) of the remaining OBs.
+        Only targets with the same PROGTEMP should be observed within
+        this OB.
+    -->
+    <spectrograph>
+      <red_Arm VPH="VPH1" binning_X="1" binning_Y="1" resolution="low"/>
+      <blue_Arm VPH="VPH1" binning_X="1" binning_Y="1" resolution="low"/>
+      <!--
+          <spectrograph> defines the configuration for both arms of the
+          spectrograph (both arms and all attributes are mandatory):
+            - binning_X:                                                [defined by PROGTEMP]
+              Arm detector binning in spectral direction for the
+              program.
+                Possible values: "1", "2", "3", "4"
+            - binning_Y:                                                [mandatory value]
+              Arm detector binning in spatial direction for the program.
+                Possible values: "1" (no other values will be accepted for science observations)
+            - resolution:                                               [defined by PROGTEMP]
+              Arm resolution for the program.
+                Possible values: "low", "high"
+            - VPH:                                                      [defined by PROGTEMP]
+              Arm grating.
+                Possible values: "n/a", "VPH1", "VPH2", "VPH3"
+                ("VPH3" only for <blue_Arm>)
+          I(N)strument configuration:                                   [NORBI.X]
+          ===========================                                    ^
+            PROGTEMP    obs_mode  resolution  red_Arm.VPH  blue_Arm.VPH
+            1****.*     "MOS"     "low"       "VPH1"       "VPH1"
+            2****.*     "MOS"     "high"      "VPH2"       "VPH2"
+            3****.*     "MOS"     "high"      "VPH2"       "VPH3"
+            4****.*     "LIFU"    "low"       "VPH1"       "VPH1"
+            5****.*     "LIFU"    "high"      "VPH2"       "VPH2"
+            6****.*     "LIFU"    "high"      "VPH2"       "VPH3"
+            7****.*     "mIFU"    "low"       "VPH1"       "VPH1"
+            8****.*     "mIFU"    "high"      "VPH2"       "VPH2"
+            9****.*     "mIFU"    "high"      "VPH2"       "VPH3"
+          B(I)nning in the spectral direction:                          [NORBI.X]
+          ====================================                               ^
+            PROGTEMP    binning_Y
+            ****1.*     1
+            ****2.*     2
+            ****3.*     3
+            ****4.*     4
+            ****9.*     (custom)
+            (All other values forbidden)
+          Some attributes remain unchangable: "binning_X" is always "1"
+          Custom (I=9) spectral binning is not available to WEAVE
+          science teams, and for all other cases must be agreed with ING
+          in advance.
+      -->
+    </spectrograph>
+    <exposures>
+      <!--
+          The SWG should provide for a limited number of observing
+          templates ("exposures") here, with a fixed calibration recipe.
+          (O)B length:                                                  [NORBI.X]
+          ============                                                    ^
+          This PROGTEMP component specifies the overall OB length
+          (inclusive of overheads). Whilst we provide the option of
+          setting the following OB lengths, please be aware that not all
+          OB lengths are available (e.g. for WEAVE science teams)
+            PROGTEMP    OB length (min)
+            *0***.*     30
+            *1***.*     60
+            *2***.*     90
+            *3***.*     120
+            *9***.*     (custom)
+          Where O=9, then the RB component of PROGTEMP (below) is
+          ignored, and the user sets exposure times manually. This mode
+          is not available to WEAVE science teams.
+          (R)ed or (B)lue arm exposure code:                            [NORBI.X]
+          ==================================                               ^^
+          It is WEAVE policy to "lock" the arms: i.e. the red and blue
+          arms must be observed with the same exposures within an OB.
+          WEAVE science teams are permitted a limited subset of the
+          below exposure options. PI surveys may use other combinations
+          at their own risk.
+            CODE  exp_time  O=0       O=1        O=2         O=3
+            0      -        1x30min   1x60min    1x90min     1x120min
+            1     60        -         -          -           2x60min
+            2     30        -         2x30min    3x30min     4x30min
+            3     20        -         3x20min    5x18min     6x20min
+            4     15        2x15min   4x15min    6x15min     8x15min
+            5     12        -         5x12min    -           10x12min
+            6     10        3x10min   6x10min    9x10min     12x10min
+            7     8.55      -         7x8.55min  10x8.55min  14x8.55min
+            8     7.5       4x7.5min  8x7.5min   12x7.5min   16x7.5min
+            9     6          5x6min   9x6min     15x6min     20x6min
+          exp_time ~= 60min/code
+          Some examples:
+            PROGTEMP = "11331":
+              MOS, LR, R: 3x20min, B: 3x20min, spectral binning: 1
+            PROGTEMP = "23331":
+              MOS, HR-Blue, R: 6x20min, B: 6x20min, spectral binning: 1
+            PROGTEMP = "32332":
+              MOS, HR-Green, R: 5x18min, B: 5x18min, spectral binning: 2
+          Some RB combinations might be restricted due to excessive
+          readout overheads, e.g.:
+            PROGTEMP = "23601":
+              MOS, HR-Blue, R: 12x10min, B: 1x120min
+          The red arm here would incur a significant overhead readout
+          penalty, and would not be completed at around the same time as
+          the blue arm.
+          NB: The "exp_time" column is for illustrative purposes and
+          includes overheads in the total OB execution time: actual time
+          on-target will be less.
+      -->
+      <exposure arm="red" cal_lamp="QTH" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="20" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="1" speed="fast" type="fibre_lampflat"/>
+      <exposure arm="blue" cal_lamp="QTH" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="20" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="1" speed="fast" type="fibre_lampflat"/>
+      <exposure arm="red" cal_lamp="ThAr" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="25" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="2" speed="fast" type="arc"/>
+      <exposure arm="blue" cal_lamp="ThAr" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="25" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="2" speed="fast" type="arc"/>
+      <exposure arm="both" cal_lamp="None" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="1020" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="3" speed="%%%" type="science"/>
+      <exposure arm="both" cal_lamp="None" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="1020" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="4" speed="%%%" type="science"/>
+      <exposure arm="both" cal_lamp="None" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="1020" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="5" speed="%%%" type="science"/>
+      <exposure arm="red" cal_lamp="ThAr" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="25" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="6" speed="fast" type="arc"/>
+      <exposure arm="blue" cal_lamp="ThAr" cal_lamp_filter_A="EMPTY" cal_lamp_filter_B="EMPTY" exp_time="25" ff_ilu_1="0" ff_ilu_2="0" ff_ilu_3="0" order="6" speed="fast" type="arc"/>
+      <!--
+          What do these values mean?
+          <exposure> defines the sequence of exposures the WEAVE
+          instrument will take within this OB. All attributes are
+          mandatory.
+            - arm:                                                      [fixed in template]
+              Arm to perform the observation with.
+                Possible values: "both", "red", "blue".
+            - cal_lamp:                                                 [fixed in template]
+              Calibration lamp chosen.
+                Possible values are: "NONE", "Hg", "Ne", "He", "Zn",
+                "Cd", "ThAr", "ThArCr", "QTH", "W"
+            - cal_lamp_filter_A:                                        [fixed in template]
+              Calibration lamp filter used in position A.
+                Possible values: "WCALU_clear1", "WCALU_ND2.0", 
+		"WCALU_ND3.0", "WCALU_ND1.0", "WCALU_ND0.5", 
+		"WCALU_DARK1", "EMPTY"
+            - cal_lamp_filter_B:                                        [fixed in template]
+              Calibration lamp filter used in position B.
+                Possible values: "WCALU_clear2", "WCALU_GG395", 
+		"WCALU_BG38", "WCALU_DARK2", "WCALU_clear3",
+		"WCALU_DARK3", "EMPTY"
+            - exp_time:                                                 [defined by PROGTEMP]
+              Time of exposure (in seconds).
+            - ff_ilu_1:                                                 [fixed in template]
+              Arm flat field illumination LED 1.
+                Possible values: [0-100]
+                (0 corresponds to off and 100 to the max intensity)
+            - ff_ilu_2:                                                 [fixed in template]
+              Arm flat field illumination LED 2.
+                Possible values: [0-100]
+                (0 corresponds to off and 100 to the max intensity)
+            - ff_ilu_3:                                                 [fixed in template]
+              Arm flat field illumination LED 3.
+                Possible values: [0-100]
+                (0 corresponds to off and 100 to the max intensity)
+            - order:                                                    [auto-generated by FITS -> XML code]
+              Order of execution of the exposure with the sequence.
+              For science exposures, links to "order" attribute of
+              <field> element below.
+	    - speed:
+	      The requested readout speed for the exposure.             [fixed in template for calib exposures]
+	        Possible values: "slow", "fast"
+            - type:                                                     [fixed in template]
+              Exposure type.
+                Possible values: "arc", "bias", "dark", "detector_flat",
+                "fibre_lampflat", "fibre_skyflat", "fibre_twiflat",
+                "salsa_arc", "salsa_lampflat", "salsa_skyflat",
+                "salsa_twiflat", "science", "stdfibre_arc",
+                "stdfibre_lampflat", "stdfibre_skyflat",
+                "stdfibre_twiflat"
+      -->
+    </exposures>
+    <!--
+        Some surveys would like to duplicate observing blocks.
+        X(+) = Clone this XML Observing Block (X) times                 [NORBI.X]
+        ===============================================                        ^
+        This component is entirely optional: XMLChecking will not fail
+        if there is no X value in the PROGTEMP.
+        If a survey wishes to clone this OB, then they can add the .X
+        directive onto the end of the PROGTEMP code.
+        Furthermore, if users want to "chain" these OBs together, such
+        that the observation of one of these clones increases the chance
+        that the remaining OBs in this group are observed, then a "+"
+        can be added to the end of PROGTEMP.
+        The "+" instructs the WEAVE Scheduler to increase the (internal,
+        survey-specific) weight of all OBs in this group. This provides
+        a mechanism to ensure that once a series of observations are
+        started, completion of the chain becomes a progressively higher
+        priority above other OBs from this survey.
+        Some examples:
+          PROGTEMP = "11331.4":
+            Create 4 OBs with the fibre configuraion as defined in this
+            XML file.
+          PROGTEMP = "11331.4+":
+            As above, but probabilistically link them to ensure the
+            chain is completed.
+      -->
+  </programme>
+  <!-- 
+       The <observation> element contains two attributes that Open Time surveys should
+       ensure are correct.
+       - tac_alloc: this attribute should be copied from the TACALLOC keyword PHU of the FITS catalogue
+       - tac_id: the TACID keyword in the FITS catalogue PHU contains a reference to the proposal 
+                 identifier used by the TAC for awarding time. If the proposal was awarded time from
+		 more than one TAC, then *only one* value should be entered here.
+  -->
+  <observation casuid="-1" chained="False" coordinate_system="ICRS" Dec_d="%%%" linkedgroup="%%%" name="CLUSTER1" ob_class="science" ob_priority="1.0" obs_mode="mIFU" obsgroup="%%%" obsgroup_validity="%%%" obstemp="IAEEB" pa="0.0" progtemp="71331" RA_d="%%%" tac_alloc="%%%" tac_id="%%%" trimester="2020A1">
+    <configure max_calibration="37" max_guide="8" max_sky="73" num_sky_fibres="740" plate="PLATE_B">
+      <conditions epoch="%%%" ha="%%%" pressure="%%%" relative_humidity="%%%" temperature="%%%" tlr="%%%"/>
+    </configure>
+    <!--
+        The <obsconstraints> element must be auto-generated by
+        FITS -> XML code (prior to running configure).
+        Each XML Observing Block has a OBSTEMP value (recorded in
+        <observation>) value, which defines:
+          OBSTEMP = "STAMB"
+            S = (S)eeing
+            T = (T)ransparency
+            A = Elevation (A)ngle [(A)irmass]
+            M = (M)oon distance
+            B = Sky (B)rightness
+        Each OBSTEMP component is divided into grades (A, B, C, D, E...)
+        with "A" being the best. These will need to translate these into
+        their numerical values as defined within the WEAVE data model.
+        For example:
+          OBSTEMP = "AAAAA"
+            S = "A" -> seeing_max="0.7"
+            T = "A" -> transparency_min="0.8"
+            A = "A" -> elevation_min="50.28"
+            M = "A" -> moondist_min="90"
+            B = "A" -> skybright_max="21.7"
+    -->
+    <obsconstraints elevation_min="33.75" moondist_min="0" seeing_max="1.5" skybright_max="21.5" transparency_min="0.8"/>
+    <!--
+        The strategy for dithering within an OB is defined in the
+        "apply_dither" attribute of the <dithering> element.
+        Dithering is only supported for the WEAVE IFU modes.
+        "apply_dither" attribute can take the following values:
+          apply_dither  Meaning
+          -1            Custom dither pattern (LIFU only)
+           0            No dithering (this value is mandatory for MOS)
+           3            Use pre-defined 3-dither pattern
+          -3            Use alternate pre-defined 3-dither pattern
+           4            Use pre-defined 4-dither pattern
+           5            Use pre-defined 5-dither pattern
+           6            Use pre-defined 6-dither pattern
+        The pre-defined dither patterns can be found in the fibre
+        configuration config file within the WEAVE data model.
+        Please be aware that use of these pre-defined patterns may
+        result in holes in the reconstructed cubelets for mIFU data
+        (e.g. the 3-dither pattern). Please consult ICD-030 for more
+        details.
+        The <offsets> element will be populated by configure, using the
+        data entered into the <fields> element.
+    -->
+    <dithering apply_dither="3" dither_version="%%%"/>
+    <surveys>
+      <survey max_fibres="740" name="WC" priority="1.0"/>
+      <!--
+          The priority in <survey> elements refers to the inter-survey
+          priority in cases where this field is shared.
+          It has no effect if the OB contains only one survey.
+      -->
+    </surveys>
+    <!--
+        The order attribute within the <field> elements corresponds to
+        the order attributes in the <exposure> elements.
+        For the MOS, they are left empty (as there is no dithering in
+        the MOS). However, for the IFU each dither position must have a
+        <field> entry that in turn points to an <exposure> with a
+        type="science" attribute.
+    -->
+    <fields>
+      <field Dec_d="-4.77650" RA_d="316.27165" order="3">
+        <target cname="WVE_21050860-0445521" targcat="WG.fits" targclass="STAR" targdec="-4.76446426088086" targepoch="2015.5" targid="WG_12278_498" targname="" targparal="0.9388131" targpmdec="-8.722932" targpmra="-3.0762475" targprio="10.0" targprog="ANY" targra="316.2858462606701" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0034726013" emag_g="" emag_gg="0.0007048689" emag_i="" emag_r="" emag_rp="0.0028091127" mag_bp="16.275145" mag_g="" mag_gg="15.820726" mag_i="" mag_r="" mag_rp="15.210631"/>
+        </target>
+        <target cname="WVE_21025294-0532132" targcat="WG.fits" targclass="STAR" targdec="-5.537010993657337" targepoch="2015.5" targid="WG_12275_1099" targname="" targparal="0.641414" targpmdec="-5.3773456" targpmra="-2.3802714" targprio="10.0" targprog="ANY" targra="315.7205863318686" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0024379583" emag_g="" emag_gg="0.00033111023" emag_i="" emag_r="" emag_rp="0.0013944287" mag_bp="15.414568" mag_g="15.476861" mag_gg="15.080811" mag_i="14.896837" mag_r="15.034464" mag_rp="14.590034"/>
+        </target>
+        <target cname="WVE_21042353-0543259" targcat="WG.fits" targclass="STAR" targdec="-5.723851505055593" targepoch="2015.5" targid="WG_12275_1207" targname="" targparal="0.40491426" targpmdec="0.6937444" targpmra="7.8126493" targprio="10.0" targprog="ANY" targra="316.09802674254735" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0026192814" emag_g="" emag_gg="0.00045120242" emag_i="" emag_r="" emag_rp="0.0012258043" mag_bp="15.273018" mag_g="15.451953" mag_gg="14.766736" mag_i="14.425253" mag_r="14.709936" mag_rp="14.110045"/>
+        </target>
+        <target cname="WVE_21024055-0527262" targcat="WG.fits" targclass="STAR" targdec="-5.457279093299084" targepoch="2015.5" targid="WG_12275_1076" targname="" targparal="0.55231595" targpmdec="-7.5696435" targpmra="-1.8853643" targprio="10.0" targprog="ANY" targra="315.66894263206956" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0019982052" emag_g="" emag_gg="0.0003722428" emag_i="" emag_r="" emag_rp="0.0017747112" mag_bp="15.920201" mag_g="16.036255" mag_gg="15.518691" mag_i="15.286518" mag_r="15.486206" mag_rp="14.962127"/>
+        </target>
+        <target cname="WVE_21022519-0527591" targcat="WG.fits" targclass="STAR" targdec="-5.466414260225721" targepoch="2015.5" targid="WG_12275_1051" targname="" targparal="1.3280452" targpmdec="3.0726435" targpmra="-3.8494554" targprio="10.0" targprog="LIFU" targra="315.60495073302474" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.013697833" emag_g="" emag_gg="0.0009971117" emag_i="" emag_r="" emag_rp="0.0075372453" mag_bp="18.340454" mag_g="18.880281" mag_gg="17.436531" mag_i="16.856256" mag_r="17.501673" mag_rp="16.50562"/>
+        </target>
+        <target cname="WVE_21035806-0542433" targcat="WG.fits" targclass="STAR" targdec="-5.712024704858814" targepoch="2015.5" targid="WG_12275_1188" targname="" targparal="0.9666056" targpmdec="0.4709017" targpmra="-0.42476898" targprio="10.0" targprog="LIFU" targra="315.9919308632271" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009337405" emag_g="" emag_gg="0.00081231707" emag_i="" emag_r="" emag_rp="0.0038826342" mag_bp="16.84488" mag_g="17.100298" mag_gg="16.263546" mag_i="15.856307" mag_r="16.184969" mag_rp="15.551186"/>
+        </target>
+        <target cname="WVE_21034494-0541170" targcat="WG.fits" targclass="STAR" targdec="-5.68806353157754" targepoch="2015.5" targid="WG_12275_1172" targname="" targparal="1.2948335" targpmdec="1.1888658" targpmra="0.6610981" targprio="10.0" targprog="LIFU" targra="315.93723954701727" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.008077573" emag_g="" emag_gg="0.00092838315" emag_i="" emag_r="" emag_rp="0.003340518" mag_bp="17.195707" mag_g="17.729326" mag_gg="16.322966" mag_i="15.734054" mag_r="16.344898" mag_rp="15.394735"/>
+        </target>
+        <target cname="WVE_21040652-0539421" targcat="WG.fits" targclass="STAR" targdec="-5.661684263060008" targepoch="2015.5" targid="WG_12275_1197" targname="" targparal="0.8085484" targpmdec="-6.552706" targpmra="-4.589236" targprio="10.0" targprog="ANY" targra="316.0271713009229" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.003761702" emag_g="" emag_gg="0.0007120622" emag_i="" emag_r="" emag_rp="0.0021007066" mag_bp="16.147495" mag_g="16.296263" mag_gg="15.644748" mag_i="15.319773" mag_r="15.5744505" mag_rp="14.998477"/>
+        </target>
+        <target cname="WVE_21030977-0536461" targcat="WG.fits" targclass="STAR" targdec="-5.612792057994796" targepoch="2015.5" targid="WG_12275_1116" targname="" targparal="1.0807607" targpmdec="-2.8275433" targpmra="-2.6633775" targprio="10.0" targprog="ANY" targra="315.79070312046105" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.005146196" emag_g="" emag_gg="0.00045423687" emag_i="" emag_r="" emag_rp="0.002438296" mag_bp="15.832444" mag_g="15.992713" mag_gg="15.35663" mag_i="15.051315" mag_r="15.271643" mag_rp="14.735317"/>
+        </target>
+        <target cname="WVE_21023966-0533540" targcat="WG.fits" targclass="STAR" targdec="-5.564990808745219" targepoch="2015.5" targid="WG_12275_1075" targname="" targparal="0.5869119" targpmdec="-6.605222" targpmra="-6.906864" targprio="10.0" targprog="ANY" targra="315.66525982433035" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020309698" emag_g="" emag_gg="0.0004040708" emag_i="" emag_r="" emag_rp="0.0021321452" mag_bp="15.701339" mag_g="15.76762" mag_gg="15.353783" mag_i="15.152978" mag_r="15.296627" mag_rp="14.836158"/>
+        </target>
+        <target cname="WVE_21040571-0541590" targcat="WG.fits" targclass="STAR" targdec="-5.699715661011604" targepoch="2015.5" targid="WG_12275_1196" targname="" targparal="2.556435" targpmdec="2.8344526" targpmra="2.2970436" targprio="10.0" targprog="LIFU" targra="316.02379720344925" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009950508" emag_g="" emag_gg="0.0007976803" emag_i="" emag_r="" emag_rp="0.004517471" mag_bp="17.075998" mag_g="17.601324" mag_gg="16.162687" mag_i="15.570722" mag_r="16.202833" mag_rp="15.225238"/>
+        </target>
+        <target cname="WVE_21034440-0541171" targcat="WG.fits" targclass="STAR" targdec="-5.688091384184482" targepoch="2015.5" targid="WG_12275_1169" targname="" targparal="2.5232682" targpmdec="-9.372821" targpmra="0.6904236" targprio="10.0" targprog="LIFU" targra="315.93499671444334" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.030664193" emag_g="" emag_gg="0.0018073297" emag_i="" emag_r="" emag_rp="0.006988606" mag_bp="18.76148" mag_g="19.304976" mag_gg="17.51589" mag_i="16.794775" mag_r="17.927021" mag_rp="16.388475"/>
+        </target>
+        <target cname="WVE_21031528-0539332" targcat="WG.fits" targclass="STAR" targdec="-5.659223065565346" targepoch="2015.5" targid="WG_12275_1126" targname="" targparal="1.3109837" targpmdec="-7.6832037" targpmra="-1.8481325" targprio="10.0" targprog="ANY" targra="315.8136586314828" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0037239243" emag_g="" emag_gg="0.0005988265" emag_i="" emag_r="" emag_rp="0.0022639823" mag_bp="16.536612" mag_g="16.766382" mag_gg="15.958291" mag_i="15.578229" mag_r="15.874127" mag_rp="15.257722"/>
+        </target>
+        <target cname="WVE_21033839-0541274" targcat="WG.fits" targclass="STAR" targdec="-5.690947386814769" targepoch="2015.5" targid="WG_12275_1159" targname="" targparal="1.5377802" targpmdec="4.1986628" targpmra="8.42962" targprio="10.0" targprog="LIFU" targra="315.909968500858" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.00884893" emag_g="" emag_gg="0.0009822146" emag_i="" emag_r="" emag_rp="0.0075414605" mag_bp="17.269297" mag_g="17.729252" mag_gg="16.44696" mag_i="15.897623" mag_r="16.436106" mag_rp="15.575184"/>
+        </target>
+        <target cname="WVE_21023861-0529236" targcat="WG.fits" targclass="STAR" targdec="-5.4899024956953655" targepoch="2015.5" targid="WG_12275_1073" targname="" targparal="0.5989729" targpmdec="-1.6930115" targpmra="0.7383797" targprio="10.0" targprog="ANY" targra="315.66086377452547" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0039058046" emag_g="" emag_gg="0.00047531718" emag_i="" emag_r="" emag_rp="0.0035681392" mag_bp="16.226273" mag_g="16.343096" mag_gg="15.825463" mag_i="15.590769" mag_r="15.798786" mag_rp="15.260459"/>
+        </target>
+        <target cname="WVE_21024167-0529265" targcat="WG.fits" targclass="STAR" targdec="-5.490683878489199" targepoch="2015.5" targid="WG_12275_1077" targname="" targparal="1.3749868" targpmdec="-1.7319826" targpmra="-6.745343" targprio="10.0" targprog="LIFU" targra="315.67361394164055" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.015192318" emag_g="" emag_gg="0.0010210174" emag_i="" emag_r="" emag_rp="0.005461481" mag_bp="18.221916" mag_g="18.882221" mag_gg="17.359722" mag_i="17.074543" mag_r="17.525833" mag_rp="16.407572"/>
+        </target>
+        <target cname="WVE_21015277-0513125" targcat="WG.fits" targclass="STAR" targdec="-5.220143985416742" targepoch="2015.5" targid="WG_12275_984" targname="" targparal="0.5858643" targpmdec="1.0055034" targpmra="4.6701145" targprio="10.0" targprog="ANY" targra="315.46985526374186" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0021332987" emag_g="" emag_gg="0.00034576614" emag_i="" emag_r="" emag_rp="0.0019513143" mag_bp="15.599188" mag_g="" mag_gg="15.255616" mag_i="" mag_r="" mag_rp="14.731052"/>
+        </target>
+        <target cname="WVE_21021914-0523440" targcat="WG.fits" targclass="STAR" targdec="-5.395557936741224" targepoch="2015.5" targid="WG_12275_1044" targname="" targparal="0.85098165" targpmdec="-9.250253" targpmra="-1.368571" targprio="10.0" targprog="ANY" targra="315.57974845853687" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0013985415" emag_g="" emag_gg="0.0003068212" emag_i="" emag_r="" emag_rp="0.0013848164" mag_bp="15.258669" mag_g="15.326338" mag_gg="14.919296" mag_i="14.738466" mag_r="14.887886" mag_rp="14.41818"/>
+        </target>
+        <target cname="WVE_21021821-0523003" targcat="WG.fits" targclass="STAR" targdec="-5.383406493994299" targepoch="2015.5" targid="WG_12275_1040" targname="" targparal="0.5496539" targpmdec="-3.1542702" targpmra="-6.0611" targprio="10.0" targprog="ANY" targra="315.57586535264085" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020413147" emag_g="" emag_gg="0.0003045131" emag_i="" emag_r="" emag_rp="0.001354619" mag_bp="15.222333" mag_g="15.345804" mag_gg="14.779243" mag_i="14.500922" mag_r="14.710677" mag_rp="14.185561"/>
+        </target>
+        <target cname="WVE_21014530-0511504" targcat="WG.fits" targclass="STAR" targdec="-5.197338838055818" targepoch="2015.5" targid="WG_12275_966" targname="" targparal="1.3999493" targpmdec="1.8551457" targpmra="5.8131204" targprio="10.0" targprog="LIFU" targra="315.4387496436254" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009283927" emag_g="" emag_gg="0.0007402141" emag_i="" emag_r="" emag_rp="0.003753104" mag_bp="17.748846" mag_g="" mag_gg="16.91057" mag_i="" mag_r="" mag_rp="16.018488"/>
+        </target>
+        <target cname="WVE_21015206-0515390" targcat="WG.fits" targclass="STAR" targdec="-5.260840116456648" targepoch="2015.5" targid="WG_12275_980" targname="" targparal="2.2932389" targpmdec="1.2560395" targpmra="9.618398" targprio="10.0" targprog="ANY" targra="315.466923879674" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004196802" emag_g="" emag_gg="0.0004633832" emag_i="" emag_r="" emag_rp="0.001850457" mag_bp="16.771048" mag_g="17.27375" mag_gg="15.901011" mag_i="15.351151" mag_r="15.956536" mag_rp="14.99369"/>
+        </target>
+        <target cname="WVE_21015256-0515317" targcat="WG.fits" targclass="STAR" targdec="-5.2587955102901" targepoch="2015.5" targid="WG_12275_981" targname="" targparal="1.1142465" targpmdec="2.5448382" targpmra="8.663297" targprio="10.0" targprog="ANY" targra="315.4690100812255" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0011975563" emag_g="" emag_gg="0.00027306055" emag_i="" emag_r="" emag_rp="0.0013192471" mag_bp="15.045327" mag_g="" mag_gg="14.696239" mag_i="" mag_r="" mag_rp="14.18479"/>
+        </target>
+        <target cname="WVE_21023020-0525074" targcat="WG.fits" targclass="STAR" targdec="-5.418728601049031" targepoch="2015.5" targid="WG_12275_1058" targname="" targparal="0.8410843" targpmdec="6.663529" targpmra="-2.6673818" targprio="10.0" targprog="LIFU" targra="315.62583018569813" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.005228604" emag_g="" emag_gg="0.00065882696" emag_i="" emag_r="" emag_rp="0.0044564134" mag_bp="17.076746" mag_g="17.315077" mag_gg="16.526188" mag_i="16.174688" mag_r="16.48993" mag_rp="15.829255"/>
+        </target>
+        <target cname="WVE_21014175-0512040" targcat="WG.fits" targclass="STAR" targdec="-5.201109240940602" targepoch="2015.5" targid="WG_12275_956" targname="" targparal="1.4594723" targpmdec="-3.9100466" targpmra="1.3341936" targprio="10.0" targprog="ANY" targra="315.4239707780574" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0027907563" emag_g="" emag_gg="0.00036260166" emag_i="" emag_r="" emag_rp="0.0013349587" mag_bp="15.748931" mag_g="" mag_gg="15.193297" mag_i="" mag_r="" mag_rp="14.505217"/>
+        </target>
+        <target cname="WVE_21013389-0508528" targcat="WG.fits" targclass="STAR" targdec="-5.148003456077093" targepoch="2015.5" targid="WG_12275_939" targname="" targparal="0.65294963" targpmdec="-3.519881" targpmra="-6.766051" targprio="10.0" targprog="ANY" targra="315.39121636870425" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0030048492" emag_g="" emag_gg="0.00047869224" emag_i="" emag_r="" emag_rp="0.002195175" mag_bp="16.25703" mag_g="" mag_gg="15.911595" mag_i="" mag_r="" mag_rp="15.407224"/>
+        </target>
+        <target cname="WVE_21015849-0523156" targcat="WG.fits" targclass="STAR" targdec="-5.387659241684535" targepoch="2015.5" targid="WG_12275_995" targname="" targparal="0.67657083" targpmdec="-8.164573" targpmra="3.7033143" targprio="10.0" targprog="ANY" targra="315.49369884992245" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002592367" emag_g="" emag_gg="0.00044673934" emag_i="" emag_r="" emag_rp="0.0017079884" mag_bp="16.084501" mag_g="16.191298" mag_gg="15.693715" mag_i="15.471428" mag_r="15.646588" mag_rp="15.148224"/>
+        </target>
+        <target cname="WVE_21014575-0517290" targcat="WG.fits" targclass="STAR" targdec="-5.291381635398905" targepoch="2015.5" targid="WG_12275_968" targname="" targparal="0.9659046" targpmdec="-5.7150335" targpmra="-0.5062258" targprio="10.0" targprog="ANY" targra="315.4406378948299" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.003426507" emag_g="" emag_gg="0.00039846028" emag_i="" emag_r="" emag_rp="0.002114569" mag_bp="16.281551" mag_g="16.425623" mag_gg="15.814298" mag_i="15.533404" mag_r="15.767167" mag_rp="15.206543"/>
+        </target>
+        <target cname="WVE_21015663-0513234" targcat="WG.fits" targclass="STAR" targdec="-5.223172131582256" targepoch="2015.5" targid="WG_12275_992" targname="" targparal="0.86889184" targpmdec="-3.5075383" targpmra="-3.3319736" targprio="10.0" targprog="LIFU" targra="315.4859558761304" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0038570673" emag_g="" emag_gg="0.00049256184" emag_i="" emag_r="" emag_rp="0.0027169648" mag_bp="16.575762" mag_g="" mag_gg="16.097666" mag_i="" mag_r="" mag_rp="15.467043"/>
+        </target>
+        <target cname="WVE_21020295-0516141" targcat="WG.fits" targclass="STAR" targdec="-5.270591718495989" targepoch="2015.5" targid="WG_12275_1005" targname="" targparal="4.182259" targpmdec="4.4814115" targpmra="3.087722" targprio="10.0" targprog="ANY" targra="315.51228864632947" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004160004" emag_g="" emag_gg="0.0005311006" emag_i="" emag_r="" emag_rp="0.0013642448" mag_bp="16.797735" mag_g="17.337713" mag_gg="15.701681" mag_i="15.021654" mag_r="15.90881" mag_rp="14.66172"/>
+        </target>
+        <target cname="WVE_21021951-0527535" targcat="WG.fits" targclass="STAR" targdec="-5.4648666748697545" targepoch="2015.5" targid="WG_12275_1045" targname="" targparal="0.8028502" targpmdec="-5.065574" targpmra="-3.3489225" targprio="10.0" targprog="ANY" targra="315.58130838847785" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.001835068" emag_g="" emag_gg="0.0003343605" emag_i="" emag_r="" emag_rp="0.0015632546" mag_bp="15.671527" mag_g="15.754128" mag_gg="15.294573" mag_i="15.090729" mag_r="15.263728" mag_rp="14.758281"/>
+        </target>
+        <target cname="WVE_21013841-0506276" targcat="WG.fits" targclass="STAR" targdec="-5.107667131679166" targepoch="2015.5" targid="WG_12278_51" targname="" targparal="1.7611941" targpmdec="0.639125" targpmra="-2.9694238" targprio="10.0" targprog="ANY" targra="315.4100570603007" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0012669347" emag_g="" emag_gg="0.00095809967" emag_i="" emag_r="" emag_rp="0.0010460893" mag_bp="14.757449" mag_g="" mag_gg="14.512689" mag_i="" mag_r="" mag_rp="14.063993"/>
+        </target>
+        <target cname="WVE_21071395-0357251" targcat="WG.fits" targclass="STAR" targdec="-3.956976241237495" targepoch="2015.5" targid="WG_12278_880" targname="" targparal="1.2319547" targpmdec="-0.06917993" targpmra="8.274472" targprio="10.0" targprog="ANY" targra="316.80814552230345" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0037680578" emag_g="" emag_gg="0.0004315221" emag_i="" emag_r="" emag_rp="0.0026352438" mag_bp="15.729869" mag_g="15.851727" mag_gg="15.293994" mag_i="14.996861" mag_r="15.255384" mag_rp="14.698592"/>
+        </target>
+        <target cname="WVE_21070101-0357120" targcat="WG.fits" targclass="STAR" targdec="-3.953345415888931" targepoch="2015.5" targid="WG_12278_848" targname="" targparal="0.6731958" targpmdec="-3.348792" targpmra="6.655227" targprio="10.0" targprog="ANY" targra="316.7542029006947" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0038084527" emag_g="" emag_gg="0.0006342668" emag_i="" emag_r="" emag_rp="0.0030334468" mag_bp="16.250431" mag_g="16.393375" mag_gg="15.811339" mag_i="15.552215" mag_r="15.778689" mag_rp="15.204884"/>
+        </target>
+        <target cname="WVE_21074244-0405250" targcat="WG.fits" targclass="STAR" targdec="-4.090270234092577" targepoch="2015.5" targid="WG_12278_938" targname="" targparal="1.0475172" targpmdec="-5.199159" targpmra="-0.7203678" targprio="10.0" targprog="LIFU" targra="316.9268504567675" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007287473" emag_g="" emag_gg="0.0009462887" emag_i="" emag_r="" emag_rp="0.0032509633" mag_bp="17.398392" mag_g="17.757784" mag_gg="16.734272" mag_i="16.245024" mag_r="16.689365" mag_rp="15.934593"/>
+        </target>
+        <target cname="WVE_21011477-0436126" targcat="WG.fits" targclass="STAR" targdec="-4.6035052571166934" targepoch="2015.5" targid="WG_12278_25" targname="" targparal="0.8720167" targpmdec="1.4092377" targpmra="-0.3484082" targprio="10.0" targprog="LIFU" targra="315.3115312255356" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.006526376" emag_g="" emag_gg="0.0005665728" emag_i="" emag_r="" emag_rp="0.006193306" mag_bp="16.878096" mag_g="" mag_gg="16.370874" mag_i="" mag_r="" mag_rp="15.715694"/>
+        </target>
+        <target cname="WVE_21065805-0356019" targcat="WG.fits" targclass="STAR" targdec="-3.933866211285535" targepoch="2015.5" targid="WG_12278_838" targname="" targparal="0.7308335" targpmdec="-1.2639909" targpmra="4.525017" targprio="10.0" targprog="ANY" targra="316.7418902231464" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0026808141" emag_g="" emag_gg="0.0008580644" emag_i="" emag_r="" emag_rp="0.0024660898" mag_bp="15.836904" mag_g="" mag_gg="15.408296" mag_i="" mag_r="" mag_rp="14.82157"/>
+        </target>
+        <target cname="WVE_21065537-0355417" targcat="WG.fits" targclass="STAR" targdec="-3.928251991255571" targepoch="2015.5" targid="WG_12278_827" targname="" targparal="1.3336535" targpmdec="-5.6060467" targpmra="-4.396639" targprio="10.0" targprog="LIFU" targra="316.73072025875746" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.012409379" emag_g="" emag_gg="0.00092249655" emag_i="" emag_r="" emag_rp="0.0057850145" mag_bp="17.848278" mag_g="18.3868" mag_gg="16.944124" mag_i="16.33271" mag_r="17.020098" mag_rp="15.966329"/>
+        </target>
+        <target cname="WVE_21012330-0435384" targcat="WG.fits" targclass="STAR" targdec="-4.593986448929835" targepoch="2015.5" targid="WG_12278_31" targname="" targparal="0.9141632" targpmdec="-7.840871" targpmra="-5.023784" targprio="10.0" targprog="LIFU" targra="315.34707296690897" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0037117722" emag_g="" emag_gg="0.0006997873" emag_i="" emag_r="" emag_rp="0.0028435485" mag_bp="16.604292" mag_g="" mag_gg="16.119658" mag_i="" mag_r="" mag_rp="15.435553"/>
+        </target>
+        <target cname="WVE_21013271-0435305" targcat="WG.fits" targclass="STAR" targdec="-4.591813570374979" targepoch="2015.5" targid="WG_12278_43" targname="" targparal="1.1450214" targpmdec="7.7396116" targpmra="1.9014597" targprio="10.0" targprog="LIFU" targra="315.38629845361856" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.006655181" emag_g="" emag_gg="0.0005823095" emag_i="" emag_r="" emag_rp="0.0021488222" mag_bp="16.954565" mag_g="" mag_gg="16.333721" mag_i="" mag_r="" mag_rp="15.593898"/>
+        </target>
+        <target cname="WVE_21075276-0408467" targcat="WG.fits" targclass="STAR" targdec="-4.146303583610784" targepoch="2015.5" targid="WG_12278_961" targname="" targparal="1.7696573" targpmdec="1.2928433" targpmra="6.0786266" targprio="10.0" targprog="LIFU" targra="316.9698425009878" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.005180454" emag_g="" emag_gg="0.00082807505" emag_i="" emag_r="" emag_rp="0.0033776045" mag_bp="17.34551" mag_g="17.885683" mag_gg="16.478718" mag_i="15.909191" mag_r="16.516962" mag_rp="15.552202"/>
+        </target>
+        <target cname="WVE_21071253-0401536" targcat="WG.fits" targclass="STAR" targdec="-4.031565745864241" targepoch="2015.5" targid="WG_12278_874" targname="" targparal="1.131957" targpmdec="-1.6539881" targpmra="7.0952215" targprio="10.0" targprog="ANY" targra="316.8021979494348" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.010086269" emag_g="" emag_gg="0.00065902696" emag_i="" emag_r="" emag_rp="0.002080114" mag_bp="16.198185" mag_g="16.40956" mag_gg="15.672722" mag_i="15.35545" mag_r="15.596208" mag_rp="15.002938"/>
+        </target>
+        <target cname="WVE_21072293-0402490" targcat="WG.fits" targclass="STAR" targdec="-4.046931934183283" targepoch="2015.5" targid="WG_12278_896" targname="" targparal="2.3615227" targpmdec="-8.8490305" targpmra="0.5714398" targprio="10.0" targprog="ANY" targra="316.8455269830089" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.00426902" emag_g="" emag_gg="0.0006687213" emag_i="" emag_r="" emag_rp="0.0023109613" mag_bp="15.330264" mag_g="15.608853" mag_gg="14.718384" mag_i="14.3313675" mag_r="14.637361" mag_rp="13.98205"/>
+        </target>
+        <target cname="WVE_21012938-0459357" targcat="WG.fits" targclass="STAR" targdec="-4.993250382066439" targepoch="2015.5" targid="WG_12278_41" targname="" targparal="0.7494153" targpmdec="-3.883096" targpmra="0.07390673" targprio="10.0" targprog="ANY" targra="315.3724277975744" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0037327257" emag_g="" emag_gg="0.00043073838" emag_i="" emag_r="" emag_rp="0.0024817595" mag_bp="16.253914" mag_g="" mag_gg="15.85353" mag_i="" mag_r="" mag_rp="15.2916355"/>
+        </target>
+        <target cname="WVE_21073270-0359549" targcat="WG.fits" targclass="STAR" targdec="-3.998592401500173" targepoch="2015.5" targid="WG_12278_912" targname="" targparal="0.640731" targpmdec="-4.7054176" targpmra="2.717701" targprio="10.0" targprog="ANY" targra="316.8862641558198" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0029291073" emag_g="" emag_gg="0.00045815136" emag_i="" emag_r="" emag_rp="0.003012578" mag_bp="15.508612" mag_g="15.612036" mag_gg="15.135269" mag_i="14.933335" mag_r="15.104887" mag_rp="14.600481"/>
+        </target>
+        <target cname="WVE_21072998-0401581" targcat="WG.fits" targclass="STAR" targdec="-4.03281265304203" targepoch="2015.5" targid="WG_12278_907" targname="" targparal="1.2308956" targpmdec="-4.6853647" targpmra="-7.450492" targprio="10.0" targprog="ANY" targra="316.87493373225817" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.003978462" emag_g="" emag_gg="0.00040146947" emag_i="" emag_r="" emag_rp="0.0017721044" mag_bp="15.073409" mag_g="15.225946" mag_gg="14.623537" mag_i="14.366191" mag_r="14.551203" mag_rp="14.019918"/>
+        </target>
+        <target cname="WVE_21011345-0454347" targcat="WG.fits" targclass="STAR" targdec="-4.909631831025924" targepoch="2015.5" targid="WG_12278_24" targname="" targparal="1.5892822" targpmdec="-6.0278006" targpmra="-2.449086" targprio="10.0" targprog="LIFU" targra="315.3060472031755" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0103641255" emag_g="" emag_gg="0.0007377628" emag_i="" emag_r="" emag_rp="0.003596122" mag_bp="17.562696" mag_g="" mag_gg="16.706938" mag_i="" mag_r="" mag_rp="15.801532"/>
+        </target>
+        <target cname="WVE_21011889-0449166" targcat="WG.fits" targclass="STAR" targdec="-4.821268583225496" targepoch="2015.5" targid="WG_12278_27" targname="" targparal="3.0323575" targpmdec="-1.9691646" targpmra="6.0107255" targprio="10.0" targprog="LIFU" targra="315.32869373456145" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.044125695" emag_g="" emag_gg="0.001042259" emag_i="" emag_r="" emag_rp="0.004324797" mag_bp="18.828787" mag_g="" mag_gg="17.480394" mag_i="" mag_r="" mag_rp="16.31179"/>
+        </target>
+        <target cname="WVE_21012445-0447007" targcat="WG.fits" targclass="STAR" targdec="-4.78352691515414" targepoch="2015.5" targid="WG_12278_34" targname="" targparal="2.0687146" targpmdec="-5.439877" targpmra="4.229147" targprio="10.0" targprog="ANY" targra="315.3518558543407" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020014155" emag_g="" emag_gg="0.00029931057" emag_i="" emag_r="" emag_rp="0.0013740219" mag_bp="15.245634" mag_g="" mag_gg="14.631456" mag_i="" mag_r="" mag_rp="13.893176"/>
+        </target>
+        <target cname="WVE_21011907-0448522" targcat="WG.fits" targclass="STAR" targdec="-4.814507171056163" targepoch="2015.5" targid="WG_12278_29" targname="" targparal="3.0462809" targpmdec="-4.733082" targpmra="5.5012326" targprio="10.0" targprog="LIFU" targra="315.3294471500874" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.01064796" emag_g="" emag_gg="0.00085664226" emag_i="" emag_r="" emag_rp="0.0034492493" mag_bp="17.941425" mag_g="" mag_gg="16.667234" mag_i="" mag_r="" mag_rp="15.544696"/>
+        </target>
+        <target cname="WVE_21012901-0445309" targcat="WG.fits" targclass="STAR" targdec="-4.758587353419499" targepoch="2015.5" targid="WG_12278_38" targname="" targparal="0.5175062" targpmdec="-4.7954245" targpmra="2.2608202" targprio="10.0" targprog="ANY" targra="315.3708620849532" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0023544282" emag_g="" emag_gg="0.00039427218" emag_i="" emag_r="" emag_rp="0.0021083283" mag_bp="15.872564" mag_g="" mag_gg="15.503217" mag_i="" mag_r="" mag_rp="14.974029"/>
+        </target>
+        <target cname="WVE_21072192-0402381" targcat="WG.fits" targclass="STAR" targdec="-4.04392878581704" targepoch="2015.5" targid="WG_12278_895" targname="" targparal="0.84084445" targpmdec="-9.444806" targpmra="-0.9834234" targprio="10.0" targprog="LIFU" targra="316.8413265579886" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.005026814" emag_g="" emag_gg="0.0008416205" emag_i="" emag_r="" emag_rp="0.005763334" mag_bp="16.752468" mag_g="16.904335" mag_gg="16.277864" mag_i="15.991507" mag_r="16.235325" mag_rp="15.63788"/>
+        </target>
+        <target cname="WVE_21011191-0452251" targcat="WG.fits" targclass="STAR" targdec="-4.873633522006364" targepoch="2015.5" targid="WG_12278_22" targname="" targparal="1.5368431" targpmdec="-6.4943476" targpmra="-4.6232553" targprio="10.0" targprog="ANY" targra="315.2996354265495" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0038926164" emag_g="" emag_gg="0.00039381467" emag_i="" emag_r="" emag_rp="0.0020491406" mag_bp="16.37296" mag_g="" mag_gg="15.737796" mag_i="" mag_r="" mag_rp="14.995484"/>
+        </target>
+        <target cname="WVE_21011218-0451546" targcat="WG.fits" targclass="STAR" targdec="-4.86516843594675" targepoch="2015.5" targid="WG_12278_23" targname="" targparal="0.9726396" targpmdec="-6.752498" targpmra="-1.6982225" targprio="10.0" targprog="ANY" targra="315.30077081926413" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0033255075" emag_g="" emag_gg="0.00029890958" emag_i="" emag_r="" emag_rp="0.0017226194" mag_bp="15.575448" mag_g="" mag_gg="15.149837" mag_i="" mag_r="" mag_rp="14.574851"/>
+        </target>
+        <target cname="WVE_21075955-0405561" targcat="WG.fits" targclass="STAR" targdec="-4.098907688306804" targepoch="2015.5" targid="WG_12278_977" targname="" targparal="1.3608019" targpmdec="-5.032953" targpmra="7.569193" targprio="10.0" targprog="LIFU" targra="316.9981359829703" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.008340519" emag_g="" emag_gg="0.0009017475" emag_i="" emag_r="" emag_rp="0.004614935" mag_bp="17.500849" mag_g="17.99173" mag_gg="16.670895" mag_i="16.11768" mag_r="16.685411" mag_rp="15.757425"/>
+        </target>
+        <target cname="WVE_21011571-0453180" targcat="WG.fits" targclass="STAR" targdec="-4.88832298088358" targepoch="2015.5" targid="WG_12278_26" targname="" targparal="0.82621354" targpmdec="-7.554195" targpmra="-3.4512875" targprio="10.0" targprog="LIFU" targra="315.3154554791925" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004899542" emag_g="" emag_gg="0.00055760046" emag_i="" emag_r="" emag_rp="0.002618727" mag_bp="16.689651" mag_g="" mag_gg="16.267843" mag_i="" mag_r="" mag_rp="15.704767"/>
+        </target>
+        <target cname="WVE_21013311-0433049" targcat="WG.fits" targclass="STAR" targdec="-4.551374521047977" targepoch="2015.5" targid="WG_12278_44" targname="" targparal="0.61650705" targpmdec="-3.5751007" targpmra="7.375377" targprio="10.0" targprog="ANY" targra="315.38796152374624" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0029394536" emag_g="" emag_gg="0.00045991552" emag_i="" emag_r="" emag_rp="0.0024134691" mag_bp="15.813307" mag_g="" mag_gg="15.421156" mag_i="" mag_r="" mag_rp="14.869063"/>
+        </target>
+        <target cname="WVE_21075174-0407104" targcat="WG.fits" targclass="STAR" targdec="-4.119545751445505" targepoch="2015.5" targid="WG_12278_960" targname="" targparal="0.72023135" targpmdec="-1.6700329" targpmra="0.63487214" targprio="10.0" targprog="LIFU" targra="316.965597059374" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007887495" emag_g="" emag_gg="0.0010544383" emag_i="" emag_r="" emag_rp="0.003657611" mag_bp="16.473719" mag_g="16.628092" mag_gg="16.038008" mag_i="15.736552" mag_r="16.007896" mag_rp="15.388836"/>
+        </target>
+        <target cname="WVE_21075531-0405353" targcat="WG.fits" targclass="STAR" targdec="-4.093147410203292" targepoch="2015.5" targid="WG_12278_967" targname="" targparal="0.81642514" targpmdec="-7.225641" targpmra="-1.0038917" targprio="10.0" targprog="LIFU" targra="316.980457551896" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0063838647" emag_g="" emag_gg="0.0007778362" emag_i="" emag_r="" emag_rp="0.0034642648" mag_bp="16.589533" mag_g="16.812845" mag_gg="16.039413" mag_i="15.686644" mag_r="15.993718" mag_rp="15.348789"/>
+        </target>
+        <target cname="WVE_21070672-0401279" targcat="WG.fits" targclass="STAR" targdec="-4.024411438085364" targepoch="2015.5" targid="WG_12278_867" targname="" targparal="2.2186928" targpmdec="3.663782" targpmra="7.8950768" targprio="10.0" targprog="LIFU" targra="316.7780030960551" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.010387843" emag_g="" emag_gg="0.0011264839" emag_i="" emag_r="" emag_rp="0.0029264544" mag_bp="17.05851" mag_g="17.624237" mag_gg="16.14397" mag_i="15.557077" mag_r="16.2233" mag_rp="15.187385"/>
+        </target>
+        <target cname="WVE_21012410-0451534" targcat="WG.fits" targclass="STAR" targdec="-4.864820298576977" targepoch="2015.5" targid="WG_12278_32" targname="" targparal="0.68713963" targpmdec="-5.7890363" targpmra="-1.4902825" targprio="10.0" targprog="ANY" targra="315.35042364207897" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002396081" emag_g="" emag_gg="0.00039816118" emag_i="" emag_r="" emag_rp="0.0019101785" mag_bp="16.00459" mag_g="" mag_gg="15.598917" mag_i="" mag_r="" mag_rp="15.0395975"/>
+        </target>
+        <target cname="WVE_21074725-0402514" targcat="WG.fits" targclass="STAR" targdec="-4.047604513786503" targepoch="2015.5" targid="WG_12278_948" targname="" targparal="0.5563959" targpmdec="0.16619521" targpmra="3.665677" targprio="10.0" targprog="ANY" targra="316.9468944506832" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0021849067" emag_g="" emag_gg="0.0004162629" emag_i="" emag_r="" emag_rp="0.001674551" mag_bp="15.447837" mag_g="15.538316" mag_gg="15.0911255" mag_i="14.898369" mag_r="15.06327" mag_rp="14.565339"/>
+        </target>
+        <target cname="WVE_21014694-0425277" targcat="WG.fits" targclass="STAR" targdec="-4.424349011309105" targepoch="2015.5" targid="WG_12278_64" targname="" targparal="1.0136486" targpmdec="-2.9731884" targpmra="-8.883155" targprio="10.0" targprog="ANY" targra="315.4455763439431" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0047017876" emag_g="" emag_gg="0.0005799644" emag_i="" emag_r="" emag_rp="0.004181738" mag_bp="16.294613" mag_g="16.442785" mag_gg="15.844022" mag_i="15.576681" mag_r="15.807741" mag_rp="15.23869"/>
+        </target>
+        <target cname="WVE_21064714-0358592" targcat="WG.fits" targclass="STAR" targdec="-3.98312319618589" targepoch="2015.5" targid="WG_12278_804" targname="" targparal="0.61448765" targpmdec="3.445473" targpmra="-6.8370624" targprio="10.0" targprog="ANY" targra="316.6964225376272" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0019426708" emag_g="" emag_gg="0.00042762118" emag_i="" emag_r="" emag_rp="0.0023243288" mag_bp="15.303108" mag_g="15.423359" mag_gg="14.874917" mag_i="14.625962" mag_r="14.849243" mag_rp="14.289248"/>
+        </target>
+        <target cname="WVE_21012847-0505037" targcat="WG.fits" targclass="STAR" targdec="-5.084361040921794" targepoch="2015.5" targid="WG_12278_37" targname="" targparal="0.9884483" targpmdec="-4.5887494" targpmra="1.4497254" targprio="10.0" targprog="LIFU" targra="315.36861983701675" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0039587757" emag_g="" emag_gg="0.00054936245" emag_i="" emag_r="" emag_rp="0.0027664832" mag_bp="16.974136" mag_g="" mag_gg="16.303213" mag_i="" mag_r="" mag_rp="15.524483"/>
+        </target>
+        <target cname="WVE_21074872-0404551" targcat="WG.fits" targclass="STAR" targdec="-4.081965488011803" targepoch="2015.5" targid="WG_12278_951" targname="" targparal="0.8275163" targpmdec="-3.979317" targpmra="-4.755143" targprio="10.0" targprog="LIFU" targra="316.95299021018474" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007537294" emag_g="" emag_gg="0.0007593922" emag_i="" emag_r="" emag_rp="0.004175525" mag_bp="17.148542" mag_g="17.394926" mag_gg="16.595112" mag_i="16.240639" mag_r="16.569897" mag_rp="15.879174"/>
+        </target>
+        <target cname="WVE_21072163-0403207" targcat="WG.fits" targclass="STAR" targdec="-4.055753205608041" targepoch="2015.5" targid="WG_12278_893" targname="" targparal="1.4804312" targpmdec="-4.4509315" targpmra="3.6179495" targprio="10.0" targprog="LIFU" targra="316.8401265725822" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0175935" emag_g="" emag_gg="0.0013130453" emag_i="" emag_r="" emag_rp="0.004773039" mag_bp="17.78881" mag_g="18.360641" mag_gg="16.922691" mag_i="16.371923" mag_r="16.976162" mag_rp="15.984901"/>
+        </target>
+        <target cname="WVE_21012691-0502502" targcat="WG.fits" targclass="STAR" targdec="-5.0472772778139925" targepoch="2015.5" targid="WG_12278_35" targname="" targparal="0.96171176" targpmdec="-3.8636746" targpmra="2.470833" targprio="10.0" targprog="ANY" targra="315.36211523626815" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.003886499" emag_g="" emag_gg="0.00044172042" emag_i="" emag_r="" emag_rp="0.002269313" mag_bp="16.289854" mag_g="" mag_gg="15.83608" mag_i="" mag_r="" mag_rp="15.2280245"/>
+        </target>
+        <target cname="WVE_21013037-0501263" targcat="WG.fits" targclass="STAR" targdec="-5.023984447156138" targepoch="2015.5" targid="WG_12278_42" targname="" targparal="0.9774818" targpmdec="-1.3095397" targpmra="-2.582695" targprio="10.0" targprog="ANY" targra="315.37653151920216" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0021242287" emag_g="" emag_gg="0.0003504316" emag_i="" emag_r="" emag_rp="0.002440167" mag_bp="15.465657" mag_g="" mag_gg="15.104441" mag_i="" mag_r="" mag_rp="14.582062"/>
+        </target>
+        <target cname="WVE_21012825-0501175" targcat="WG.fits" targclass="STAR" targdec="-5.02151402207834" targepoch="2015.5" targid="WG_12278_36" targname="" targparal="1.1489393" targpmdec="-6.5614123" targpmra="-6.687567" targprio="10.0" targprog="ANY" targra="315.36772014980755" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0027325724" emag_g="" emag_gg="0.0003838555" emag_i="" emag_r="" emag_rp="0.0015837413" mag_bp="15.67684" mag_g="" mag_gg="15.266566" mag_i="" mag_r="" mag_rp="14.697265"/>
+        </target>
+        <target cname="WVE_21012917-0446264" targcat="WG.fits" targclass="STAR" targdec="-4.7740027295014755" targepoch="2015.5" targid="WG_12278_39" targname="" targparal="0.7287866" targpmdec="-8.901483" targpmra="-2.7083886" targprio="10.0" targprog="ANY" targra="315.3715212978406" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0016923945" emag_g="" emag_gg="0.0003470174" emag_i="" emag_r="" emag_rp="0.0019244729" mag_bp="15.570187" mag_g="" mag_gg="15.15213" mag_i="" mag_r="" mag_rp="14.577336"/>
+        </target>
+        <target cname="WVE_21075843-0406479" targcat="WG.fits" targclass="STAR" targdec="-4.1132973358752505" targepoch="2015.5" targid="WG_12278_974" targname="" targparal="0.90543514" targpmdec="0.1407203" targpmra="4.4248514" targprio="10.0" targprog="LIFU" targra="316.99347034022253" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0047201873" emag_g="" emag_gg="0.00067978015" emag_i="" emag_r="" emag_rp="0.004103034" mag_bp="16.743654" mag_g="16.944136" mag_gg="16.2117" mag_i="15.853657" mag_r="16.183466" mag_rp="15.514951"/>
+        </target>
+        <target cname="WVE_21013759-0506552" targcat="WG.fits" targclass="STAR" targdec="-5.115343443162406" targepoch="2015.5" targid="WG_12278_48" targname="" targparal="2.6016667" targpmdec="1.964957" targpmra="9.113568" targprio="10.0" targprog="ANY" targra="315.4066428040777" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0027047533" emag_g="" emag_gg="0.0008122322" emag_i="" emag_r="" emag_rp="0.0018157341" mag_bp="16.291063" mag_g="" mag_gg="15.6332655" mag_i="" mag_r="" mag_rp="14.825465"/>
+        </target>
+        <target cname="WVE_21011889-0440001" targcat="WG.fits" targclass="STAR" targdec="-4.6666992320005205" targepoch="2015.5" targid="WG_12278_28" targname="" targparal="1.1733185" targpmdec="-1.6205901" targpmra="8.865341" targprio="10.0" targprog="LIFU" targra="315.32872526772866" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.006029883" emag_g="" emag_gg="0.0005203705" emag_i="" emag_r="" emag_rp="0.0025800387" mag_bp="16.763342" mag_g="" mag_gg="16.159662" mag_i="" mag_r="" mag_rp="15.426462"/>
+        </target>
+        <target cname="WVE_21013410-0434063" targcat="WG.fits" targclass="STAR" targdec="-4.5684102190443445" targepoch="2015.5" targid="WG_12278_45" targname="" targparal="1.1828775" targpmdec="-3.540498" targpmra="3.3977203" targprio="10.0" targprog="LIFU" targra="315.3920667070502" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.013275907" emag_g="" emag_gg="0.0009906804" emag_i="" emag_r="" emag_rp="0.005710931" mag_bp="17.757933" mag_g="" mag_gg="17.034409" mag_i="" mag_r="" mag_rp="16.210508"/>
+        </target>
+        <target cname="WVE_21012924-0427555" targcat="WG.fits" targclass="STAR" targdec="-4.465426817630612" targepoch="2015.5" targid="WG_12278_40" targname="" targparal="0.79334986" targpmdec="-4.664598" targpmra="2.7410026" targprio="10.0" targprog="LIFU" targra="315.3718307135081" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009876076" emag_g="" emag_gg="0.0006765027" emag_i="" emag_r="" emag_rp="0.0038154395" mag_bp="17.057648" mag_g="17.344833" mag_gg="16.462143" mag_i="16.062004" mag_r="16.420706" mag_rp="15.7375965"/>
+        </target>
+        <target cname="WVE_21065911-0359318" targcat="WG.fits" targclass="STAR" targdec="-3.9921683784436466" targepoch="2015.5" targid="WG_12278_842" targname="" targparal="0.945143" targpmdec="-8.855186" targpmra="0.33225662" targprio="10.0" targprog="ANY" targra="316.74630103485197" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0036849703" emag_g="" emag_gg="0.00050213706" emag_i="" emag_r="" emag_rp="0.0016990027" mag_bp="15.871372" mag_g="16.051138" mag_gg="15.374228" mag_i="15.073937" mag_r="15.324932" mag_rp="14.73279"/>
+        </target>
+        <target cname="WVE_21012418-0459295" targcat="WG.fits" targclass="STAR" targdec="-4.991514388667101" targepoch="2015.5" targid="WG_12278_33" targname="" targparal="0.60629284" targpmdec="1.6145754" targpmra="3.839761" targprio="10.0" targprog="ANY" targra="315.3507701831237" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0028366274" emag_g="" emag_gg="0.00035743965" emag_i="" emag_r="" emag_rp="0.0016365261" mag_bp="15.536772" mag_g="" mag_gg="15.208454" mag_i="" mag_r="" mag_rp="14.720208"/>
+        </target>
+        <target cname="WVE_21012198-0443247" targcat="WG.fits" targclass="STAR" targdec="-4.723528941299897" targepoch="2015.5" targid="WG_12278_30" targname="" targparal="0.88228685" targpmdec="-5.741461" targpmra="4.626156" targprio="10.0" targprog="LIFU" targra="315.341583458919" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0049027684" emag_g="" emag_gg="0.0005878543" emag_i="" emag_r="" emag_rp="0.0036308863" mag_bp="16.904415" mag_g="" mag_gg="16.339817" mag_i="" mag_r="" mag_rp="15.64862"/>
+        </target>
+        <target cname="WVE_21060634-0352473" targcat="WG.fits" targclass="STAR" targdec="-3.8798023998821503" targepoch="2015.5" targid="WG_12278_681" targname="" targparal="0.7724444" targpmdec="-0.7185537" targpmra="1.6193771" targprio="10.0" targprog="LIFU" targra="316.5263986941861" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0036706787" emag_g="" emag_gg="0.00078533834" emag_i="" emag_r="" emag_rp="0.005247006" mag_bp="17.061274" mag_g="17.312325" mag_gg="16.503386" mag_i="16.152357" mag_r="16.410763" mag_rp="15.80047"/>
+        </target>
+        <target cname="WVE_21060212-0354446" targcat="WG.fits" targclass="STAR" targdec="-3.912375489004252" targepoch="2015.5" targid="WG_12278_668" targname="" targparal="1.1769452" targpmdec="-6.8302903" targpmra="2.7094572" targprio="10.0" targprog="LIFU" targra="316.5088384318672" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.00693392" emag_g="" emag_gg="0.00070417294" emag_i="" emag_r="" emag_rp="0.002575063" mag_bp="16.820112" mag_g="17.096836" mag_gg="16.221949" mag_i="15.797211" mag_r="16.146202" mag_rp="15.482384"/>
+        </target>
+        <target cname="WVE_21061278-0353329" targcat="WG.fits" targclass="STAR" targdec="-3.892476381691605" targepoch="2015.5" targid="WG_12278_706" targname="" targparal="0.93845874" targpmdec="5.6477613" targpmra="-1.7389269" targprio="10.0" targprog="LIFU" targra="316.55324502993716" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004146654" emag_g="" emag_gg="0.0014837342" emag_i="" emag_r="" emag_rp="0.0032759102" mag_bp="16.641657" mag_g="16.798367" mag_gg="16.181652" mag_i="15.84715" mag_r="16.10069" mag_rp="15.4981365"/>
+        </target>
+        <target cname="WVE_21055793-0353022" targcat="WG.fits" targclass="STAR" targdec="-3.8839345473738436" targepoch="2015.5" targid="WG_12278_652" targname="" targparal="0.867051" targpmdec="-3.1176047" targpmra="2.5154822" targprio="10.0" targprog="LIFU" targra="316.4913749581388" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0060085906" emag_g="" emag_gg="0.0006908395" emag_i="" emag_r="" emag_rp="0.0025317501" mag_bp="16.766455" mag_g="17.008286" mag_gg="16.19263" mag_i="15.817934" mag_r="16.14541" mag_rp="15.473244"/>
+        </target>
+        <target cname="WVE_21055870-0352281" targcat="WG.fits" targclass="STAR" targdec="-3.874475898298951" targepoch="2015.5" targid="WG_12278_657" targname="" targparal="0.7447406" targpmdec="-4.2721157" targpmra="0.2542578" targprio="10.0" targprog="ANY" targra="316.4945781260733" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0041953116" emag_g="" emag_gg="0.00054004387" emag_i="" emag_r="" emag_rp="0.0021027199" mag_bp="15.920182" mag_g="16.041298" mag_gg="15.493912" mag_i="15.238101" mag_r="15.423323" mag_rp="14.911625"/>
+        </target>
+        <target cname="WVE_21051058-0350387" targcat="WG.fits" targclass="STAR" targdec="-3.844082587364078" targepoch="2015.5" targid="WG_12278_502" targname="" targparal="1.5192952" targpmdec="-2.0569344" targpmra="-2.3378642" targprio="10.0" targprog="ANY" targra="316.2941039076065" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0026350257" emag_g="" emag_gg="0.0005207828" emag_i="" emag_r="" emag_rp="0.0014052994" mag_bp="15.739446" mag_g="15.895178" mag_gg="15.260146" mag_i="14.94768" mag_r="15.208236" mag_rp="14.624552"/>
+        </target>
+        <target cname="WVE_21051004-0351351" targcat="WG.fits" targclass="STAR" targdec="-3.859736505655375" targepoch="2015.5" targid="WG_12278_501" targname="" targparal="1.3257648" targpmdec="-9.270461" targpmra="0.2249521" targprio="10.0" targprog="ANY" targra="316.29183617119827" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0029606079" emag_g="" emag_gg="0.0006459185" emag_i="" emag_r="" emag_rp="0.0019397318" mag_bp="15.979039" mag_g="16.195492" mag_gg="15.443536" mag_i="15.083904" mag_r="15.378817" mag_rp="14.734768"/>
+        </target>
+        <target cname="WVE_21054758-0349096" targcat="WG.fits" targclass="STAR" targdec="-3.819345340712796" targepoch="2015.5" targid="WG_12278_620" targname="" targparal="1.7364452" targpmdec="-4.405628" targpmra="-5.952186" targprio="10.0" targprog="ANY" targra="316.4482346883113" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0040323203" emag_g="" emag_gg="0.00067830825" emag_i="" emag_r="" emag_rp="0.0032018153" mag_bp="15.143652" mag_g="15.35332" mag_gg="14.628024" mag_i="14.290694" mag_r="14.577779" mag_rp="13.922873"/>
+        </target>
+        <target cname="WVE_21054971-0348150" targcat="WG.fits" targclass="STAR" targdec="-3.8041576658812186" targepoch="2015.5" targid="WG_12278_629" targname="" targparal="0.98506194" targpmdec="1.0326666" targpmra="0.8021796" targprio="10.0" targprog="ANY" targra="316.45713766655405" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0039575184" emag_g="" emag_gg="0.0005086464" emag_i="" emag_r="" emag_rp="0.0023381244" mag_bp="15.484146" mag_g="15.570918" mag_gg="15.086471" mag_i="14.8826" mag_r="15.031017" mag_rp="14.536852"/>
+        </target>
+        <target cname="WVE_21053373-0352365" targcat="WG.fits" targclass="STAR" targdec="-3.876810893814064" targepoch="2015.5" targid="WG_12278_579" targname="" targparal="1.5478594" targpmdec="-5.960099" targpmra="4.415663" targprio="10.0" targprog="ANY" targra="316.3905490598507" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0016546756" emag_g="" emag_gg="0.00043307082" emag_i="" emag_r="" emag_rp="0.0022361265" mag_bp="15.634187" mag_g="15.818943" mag_gg="15.1208725" mag_i="14.781703" mag_r="15.0412035" mag_rp="14.464531"/>
+        </target>
+        <target cname="WVE_21061134-0350201" targcat="WG.fits" targclass="STAR" targdec="-3.8389244382370356" targepoch="2015.5" targid="WG_12278_701" targname="" targparal="0.4945511" targpmdec="2.2044945" targpmra="-4.543939" targprio="10.0" targprog="ANY" targra="316.54725906020684" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0030697403" emag_g="" emag_gg="0.00055060355" emag_i="" emag_r="" emag_rp="0.0019211401" mag_bp="15.941187" mag_g="16.04331" mag_gg="15.567334" mag_i="15.368015" mag_r="15.508893" mag_rp="15.030522"/>
+        </target>
+        <target cname="WVE_21044501-0351550" targcat="WG.fits" targclass="STAR" targdec="-3.865282857767511" targepoch="2015.5" targid="WG_12278_425" targname="" targparal="1.5421833" targpmdec="2.8077447" targpmra="-2.3604257" targprio="10.0" targprog="ANY" targra="316.18755335681334" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0013635482" emag_g="" emag_gg="0.0003436167" emag_i="" emag_r="" emag_rp="0.0012573263" mag_bp="15.055231" mag_g="15.198143" mag_gg="14.597508" mag_i="14.318301" mag_r="14.551822" mag_rp="13.993698"/>
+        </target>
+        <target cname="WVE_21062980-0353354" targcat="WG.fits" targclass="STAR" targdec="-3.893176495397902" targepoch="2015.5" targid="WG_12278_745" targname="" targparal="0.76563036" targpmdec="-3.5383503" targpmra="0.7568843" targprio="10.0" targprog="LIFU" targra="316.62414926559296" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0038915284" emag_g="" emag_gg="0.00063768326" emag_i="" emag_r="" emag_rp="0.0031175732" mag_bp="16.423325" mag_g="16.541773" mag_gg="16.005264" mag_i="15.730396" mag_r="15.977269" mag_rp="15.419583"/>
+        </target>
+        <target cname="WVE_21060361-0350394" targcat="WG.fits" targclass="STAR" targdec="-3.8442653683182337" targepoch="2015.5" targid="WG_12278_673" targname="" targparal="1.4970236" targpmdec="-3.4273107" targpmra="8.653824" targprio="10.0" targprog="LIFU" targra="316.5150480084747" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.006858908" emag_g="" emag_gg="0.00088396145" emag_i="" emag_r="" emag_rp="0.0033410958" mag_bp="17.213472" mag_g="17.67032" mag_gg="16.394104" mag_i="15.871646" mag_r="16.38386" mag_rp="15.508822"/>
+        </target>
+        <target cname="WVE_21043992-0351313" targcat="WG.fits" targclass="STAR" targdec="-3.85870180261867" targepoch="2015.5" targid="WG_12278_405" targname="" targparal="1.0315495" targpmdec="-1.8581365" targpmra="-2.7527614" targprio="10.0" targprog="LIFU" targra="316.1663154618649" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009360032" emag_g="" emag_gg="0.0009831465" emag_i="" emag_r="" emag_rp="0.0060538137" mag_bp="17.385519" mag_g="17.594437" mag_gg="16.816835" mag_i="16.462584" mag_r="16.79728" mag_rp="16.117792"/>
+        </target>
+        <target cname="WVE_21063026-0355323" targcat="WG.fits" targclass="STAR" targdec="-3.925636163244989" targepoch="2015.5" targid="WG_12278_747" targname="" targparal="0.5877954" targpmdec="1.7688049" targpmra="7.2079835" targprio="10.0" targprog="ANY" targra="316.6260868323443" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020071506" emag_g="" emag_gg="0.0005401455" emag_i="" emag_r="" emag_rp="0.0020861367" mag_bp="15.8485775" mag_g="15.950155" mag_gg="15.455719" mag_i="15.197397" mag_r="15.423174" mag_rp="14.895645"/>
+        </target>
+        <target cname="WVE_21042725-0352126" targcat="WG.fits" targclass="STAR" targdec="-3.8701687775902016" targepoch="2015.5" targid="WG_12278_380" targname="" targparal="0.88440514" targpmdec="-0.40762958" targpmra="0.76678747" targprio="10.0" targprog="ANY" targra="316.11352600157204" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020772938" emag_g="" emag_gg="0.0005001788" emag_i="" emag_r="" emag_rp="0.0019415603" mag_bp="15.96481" mag_g="16.08067" mag_gg="15.553699" mag_i="15.259072" mag_r="15.511434" mag_rp="14.964462"/>
+        </target>
+        <target cname="WVE_21065717-0533413" targcat="WG.fits" targclass="STAR" targdec="-5.561480033475852" targepoch="2015.5" targid="WG_12278_835" targname="" targparal="1.2373832" targpmdec="-1.7716027" targpmra="3.4231768" targprio="10.0" targprog="ANY" targra="316.73821365361096" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002833704" emag_g="" emag_gg="0.00038549723" emag_i="" emag_r="" emag_rp="0.001275917" mag_bp="15.131106" mag_g="15.274314" mag_gg="14.686605" mag_i="14.421853" mag_r="14.644096" mag_rp="14.089383"/>
+        </target>
+        <target cname="WVE_21062130-0540336" targcat="WG.fits" targclass="STAR" targdec="-5.676007593373976" targepoch="2015.5" targid="WG_12278_723" targname="" targparal="0.7539772" targpmdec="-0.3491198" targpmra="2.744189" targprio="10.0" targprog="ANY" targra="316.5887563448003" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0029501684" emag_g="" emag_gg="0.00045914223" emag_i="" emag_r="" emag_rp="0.004067634" mag_bp="15.229721" mag_g="15.3512945" mag_gg="14.795554" mag_i="14.5274935" mag_r="14.726608" mag_rp="14.201293"/>
+        </target>
+        <target cname="WVE_21065809-0533506" targcat="WG.fits" targclass="STAR" targdec="-5.564062581915706" targepoch="2015.5" targid="WG_12278_839" targname="" targparal="0.63774633" targpmdec="-4.326729" targpmra="5.534028" targprio="10.0" targprog="ANY" targra="316.74204277555407" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0031447134" emag_g="" emag_gg="0.000399997" emag_i="" emag_r="" emag_rp="0.0015936479" mag_bp="15.214322" mag_g="15.432849" mag_gg="14.656518" mag_i="14.314809" mag_r="14.598114" mag_rp="13.969203"/>
+        </target>
+        <target cname="WVE_21051565-0545569" targcat="WG.fits" targclass="STAR" targdec="-5.765798224352957" targepoch="2015.5" targid="WG_12278_520" targname="" targparal="0.6375837" targpmdec="-7.816377" targpmra="-4.581675" targprio="10.0" targprog="ANY" targra="316.3151927525607" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0053558145" emag_g="" emag_gg="0.0005129734" emag_i="" emag_r="" emag_rp="0.0014157256" mag_bp="15.124491" mag_g="15.198059" mag_gg="14.755079" mag_i="14.529642" mag_r="14.716232" mag_rp="14.224868"/>
+        </target>
+        <target cname="WVE_21063349-0540319" targcat="WG.fits" targclass="STAR" targdec="-5.6755141323694955" targepoch="2015.5" targid="WG_12278_755" targname="" targparal="0.9757328" targpmdec="1.3032601" targpmra="0.71392524" targprio="10.0" targprog="ANY" targra="316.63953383849895" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.023283465" emag_g="" emag_gg="0.0010796059" emag_i="" emag_r="" emag_rp="0.023417117" mag_bp="16.161512" mag_g="16.434677" mag_gg="15.75722" mag_i="15.432397" mag_r="15.70359" mag_rp="14.980357"/>
+        </target>
+        <target cname="WVE_21052944-0544337" targcat="WG.fits" targclass="STAR" targdec="-5.742683534914822" targepoch="2015.5" targid="WG_12278_558" targname="" targparal="1.210805" targpmdec="0.03304357" targpmra="1.2743227" targprio="10.0" targprog="LIFU" targra="316.3726505397915" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.008119978" emag_g="" emag_gg="0.0015301554" emag_i="" emag_r="" emag_rp="0.004136527" mag_bp="17.551134" mag_g="17.957169" mag_gg="16.74858" mag_i="16.242376" mag_r="16.697788" mag_rp="15.914552"/>
+        </target>
+        <target cname="WVE_21053601-0543304" targcat="WG.fits" targclass="STAR" targdec="-5.7251006192670895" targepoch="2015.5" targid="WG_12278_588" targname="" targparal="1.2026216" targpmdec="-6.034244" targpmra="2.9447076" targprio="10.0" targprog="LIFU" targra="316.4000312751153" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0059750266" emag_g="" emag_gg="0.0009565415" emag_i="" emag_r="" emag_rp="0.0044885576" mag_bp="16.78987" mag_g="17.051199" mag_gg="16.172579" mag_i="15.736204" mag_r="16.077898" mag_rp="15.4288845"/>
+        </target>
+        <target cname="WVE_21073581-0528031" targcat="WG.fits" targclass="STAR" targdec="-5.4675251901400275" targepoch="2015.5" targid="WG_12278_925" targname="" targparal="0.492046" targpmdec="-4.5954742" targpmra="5.900769" targprio="10.0" targprog="ANY" targra="316.89921595238167" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002287854" emag_g="" emag_gg="0.00044233887" emag_i="" emag_r="" emag_rp="0.0021827917" mag_bp="15.634636" mag_g="" mag_gg="15.240039" mag_i="" mag_r="" mag_rp="14.6787405"/>
+        </target>
+        <target cname="WVE_21053346-0542093" targcat="WG.fits" targclass="STAR" targdec="-5.702596302902912" targepoch="2015.5" targid="WG_12278_577" targname="" targparal="1.819736" targpmdec="-8.042907" targpmra="-2.8210695" targprio="10.0" targprog="LIFU" targra="316.3894195386525" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.018254744" emag_g="" emag_gg="0.001664478" emag_i="" emag_r="" emag_rp="0.012296997" mag_bp="18.310766" mag_g="18.795841" mag_gg="17.426497" mag_i="16.831867" mag_r="17.43089" mag_rp="16.477032"/>
+        </target>
+        <target cname="WVE_21072494-0531100" targcat="WG.fits" targclass="STAR" targdec="-5.5194376780182415" targepoch="2015.5" targid="WG_12278_900" targname="" targparal="0.87655914" targpmdec="-3.3616748" targpmra="4.5894513" targprio="10.0" targprog="ANY" targra="316.85392085543185" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0016455128" emag_g="" emag_gg="0.0004213433" emag_i="" emag_r="" emag_rp="0.0009419421" mag_bp="14.924485" mag_g="15.046248" mag_gg="14.527552" mag_i="14.293856" mag_r="14.5114975" mag_rp="13.96321"/>
+        </target>
+        <target cname="WVE_21074220-0526002" targcat="WG.fits" targclass="STAR" targdec="-5.433378969439511" targepoch="2015.5" targid="WG_12278_937" targname="" targparal="1.6253501" targpmdec="-5.286385" targpmra="4.517516" targprio="10.0" targprog="LIFU" targra="316.9258160749384" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.012985483" emag_g="" emag_gg="0.0010063939" emag_i="" emag_r="" emag_rp="0.004956512" mag_bp="17.831085" mag_g="" mag_gg="16.938486" mag_i="" mag_r="" mag_rp="15.995905"/>
+        </target>
+        <target cname="WVE_21073542-0528400" targcat="WG.fits" targclass="STAR" targdec="-5.477766728958945" targepoch="2015.5" targid="WG_12278_924" targname="" targparal="0.67961967" targpmdec="-2.5919502" targpmra="0.060035825" targprio="10.0" targprog="ANY" targra="316.897573141157" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004289299" emag_g="" emag_gg="0.00057511823" emag_i="" emag_r="" emag_rp="0.0029962354" mag_bp="16.204762" mag_g="16.298368" mag_gg="15.854843" mag_i="15.652832" mag_r="15.845073" mag_rp="15.336967"/>
+        </target>
+        <target cname="WVE_21080402-0520523" targcat="WG.fits" targclass="STAR" targdec="-5.347865650308646" targepoch="2015.5" targid="WG_12278_982" targname="" targparal="0.71348315" targpmdec="-1.9757231" targpmra="-0.37153736" targprio="10.0" targprog="ANY" targra="317.01673885124916" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0041528502" emag_g="" emag_gg="0.00036035" emag_i="" emag_r="" emag_rp="0.001915726" mag_bp="14.888575" mag_g="" mag_gg="14.541345" mag_i="" mag_r="" mag_rp="14.027718"/>
+        </target>
+        <target cname="WVE_21073939-0530306" targcat="WG.fits" targclass="STAR" targdec="-5.508505394471109" targepoch="2015.5" targid="WG_12278_934" targname="" targparal="0.9876842" targpmdec="-0.79552436" targpmra="-0.21229535" targprio="10.0" targprog="LIFU" targra="316.91414343769554" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0059429575" emag_g="" emag_gg="0.0009379826" emag_i="" emag_r="" emag_rp="0.004028032" mag_bp="16.785677" mag_g="17.00503" mag_gg="16.242847" mag_i="15.892188" mag_r="16.188353" mag_rp="15.558159"/>
+        </target>
+        <target cname="WVE_21071442-0531506" targcat="WG.fits" targclass="STAR" targdec="-5.530712476034539" targepoch="2015.5" targid="WG_12278_881" targname="" targparal="0.49597767" targpmdec="-3.5932877" targpmra="7.4916487" targprio="10.0" targprog="ANY" targra="316.81007859502955" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004123286" emag_g="" emag_gg="0.0004679699" emag_i="" emag_r="" emag_rp="0.0024450114" mag_bp="15.937476" mag_g="16.044584" mag_gg="15.58194" mag_i="15.361067" mag_r="15.573966" mag_rp="15.040208"/>
+        </target>
+        <target cname="WVE_21070275-0536518" targcat="WG.fits" targclass="STAR" targdec="-5.614387272713588" targepoch="2015.5" targid="WG_12278_856" targname="" targparal="0.6094078" targpmdec="-1.7122928" targpmra="9.109468" targprio="10.0" targprog="ANY" targra="316.76145244532705" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020186661" emag_g="" emag_gg="0.00056810584" emag_i="" emag_r="" emag_rp="0.005291926" mag_bp="16.096043" mag_g="16.198261" mag_gg="15.712477" mag_i="15.497622" mag_r="15.690208" mag_rp="15.156412"/>
+        </target>
+        <target cname="WVE_21065608-0539276" targcat="WG.fits" targclass="STAR" targdec="-5.657679677002833" targepoch="2015.5" targid="WG_12278_829" targname="" targparal="0.8840623" targpmdec="-0.50264066" targpmra="3.5348566" targprio="10.0" targprog="ANY" targra="316.73368034260596" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0028644921" emag_g="" emag_gg="0.00047848857" emag_i="" emag_r="" emag_rp="0.0026452406" mag_bp="15.348216" mag_g="15.435611" mag_gg="14.970232" mag_i="14.736549" mag_r="14.927607" mag_rp="14.4326935"/>
+        </target>
+        <target cname="WVE_21070116-0537562" targcat="WG.fits" targclass="STAR" targdec="-5.632285637994171" targepoch="2015.5" targid="WG_12278_849" targname="" targparal="0.878589" targpmdec="-4.108078" targpmra="-8.903054" targprio="10.0" targprog="ANY" targra="316.7548134710776" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004518089" emag_g="" emag_gg="0.0005465193" emag_i="" emag_r="" emag_rp="0.004183253" mag_bp="16.208405" mag_g="16.367077" mag_gg="15.727857" mag_i="15.434427" mag_r="15.664606" mag_rp="15.096555"/>
+        </target>
+        <target cname="WVE_21070358-0537524" targcat="WG.fits" targclass="STAR" targdec="-5.631233863004693" targepoch="2015.5" targid="WG_12278_857" targname="" targparal="0.7363775" targpmdec="-1.2664976" targpmra="1.6238323" targprio="10.0" targprog="ANY" targra="316.7649049676266" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0042707305" emag_g="" emag_gg="0.0009145117" emag_i="" emag_r="" emag_rp="0.003020467" mag_bp="15.862864" mag_g="16.007973" mag_gg="15.459192" mag_i="15.20299" mag_r="15.453142" mag_rp="14.862406"/>
+        </target>
+        <target cname="WVE_21070529-0537150" targcat="WG.fits" targclass="STAR" targdec="-5.620827871746147" targepoch="2015.5" targid="WG_12278_861" targname="" targparal="0.9032062" targpmdec="-8.244057" targpmra="-0.35156208" targprio="10.0" targprog="ANY" targra="316.77204211913926" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0019258349" emag_g="" emag_gg="0.00045140318" emag_i="" emag_r="" emag_rp="0.0015446495" mag_bp="15.359945" mag_g="15.456889" mag_gg="14.996623" mag_i="14.795781" mag_r="14.984687" mag_rp="14.462941"/>
+        </target>
+        <target cname="WVE_21043954-0545239" targcat="WG.fits" targclass="STAR" targdec="-5.756652481596212" targepoch="2015.5" targid="WG_12278_404" targname="" targparal="1.3996439" targpmdec="0.24630015" targpmra="7.0308642" targprio="10.0" targprog="LIFU" targra="316.16476540901954" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0071325125" emag_g="" emag_gg="0.0010157747" emag_i="" emag_r="" emag_rp="0.0047880136" mag_bp="17.595495" mag_g="18.007496" mag_gg="16.850748" mag_i="16.339397" mag_r="16.79872" mag_rp="16.003912"/>
+        </target>
+        <target cname="WVE_21043676-0543200" targcat="WG.fits" targclass="STAR" targdec="-5.722234690273941" targepoch="2015.5" targid="WG_12278_396" targname="" targparal="0.74154204" targpmdec="1.3071911" targpmra="-6.3391585" targprio="10.0" targprog="ANY" targra="316.1531480628343" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0018582862" emag_g="" emag_gg="0.00037741143" emag_i="" emag_r="" emag_rp="0.0011648216" mag_bp="15.16368" mag_g="15.2757635" mag_gg="14.760086" mag_i="14.509224" mag_r="14.698118" mag_rp="14.202642"/>
+        </target>
+        <target cname="WVE_21064308-0535468" targcat="WG.fits" targclass="STAR" targdec="-5.5963410727412075" targepoch="2015.5" targid="WG_12278_788" targname="" targparal="1.249167" targpmdec="-1.2838986" targpmra="4.8786545" targprio="10.0" targprog="LIFU" targra="316.6795002493857" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.014910602" emag_g="" emag_gg="0.0010988525" emag_i="" emag_r="" emag_rp="0.010244097" mag_bp="17.917862" mag_g="18.441517" mag_gg="17.096361" mag_i="16.5524" mag_r="17.108717" mag_rp="16.178347"/>
+        </target>
+        <target cname="WVE_21042681-0540351" targcat="WG.fits" targclass="STAR" targdec="-5.6764215834069685" targepoch="2015.5" targid="WG_12278_377" targname="" targparal="0.742827" targpmdec="-8.93295" targpmra="-3.5177054" targprio="10.0" targprog="ANY" targra="316.11170431830607" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0057113124" emag_g="" emag_gg="0.0007707" emag_i="" emag_r="" emag_rp="0.0034666078" mag_bp="16.160484" mag_g="16.241417" mag_gg="15.789885" mag_i="15.576592" mag_r="15.734186" mag_rp="15.255265"/>
+        </target>
+        <target cname="WVE_21042606-0542166" targcat="WG.fits" targclass="STAR" targdec="-5.7046115487480495" targepoch="2015.5" targid="WG_12278_375" targname="" targparal="1.0441012" targpmdec="-2.8082886" targpmra="1.5381781" targprio="10.0" targprog="ANY" targra="316.10857585989464" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0038958644" emag_g="" emag_gg="0.00045675848" emag_i="" emag_r="" emag_rp="0.0025785933" mag_bp="15.177398" mag_g="15.330078" mag_gg="14.7101965" mag_i="14.404922" mag_r="14.645546" mag_rp="14.086019"/>
+        </target>
+        <target cname="WVE_21042106-0540538" targcat="WG.fits" targclass="STAR" targdec="-5.6816098663094055" targepoch="2015.5" targid="WG_12278_365" targname="" targparal="0.47504362" targpmdec="-3.8222609" targpmra="6.088639" targprio="10.0" targprog="ANY" targra="316.0877314803518" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0023669214" emag_g="" emag_gg="0.00045023047" emag_i="" emag_r="" emag_rp="0.0017044332" mag_bp="15.560997" mag_g="15.7209" mag_gg="15.061894" mag_i="14.74182" mag_r="15.004944" mag_rp="14.412238"/>
+        </target>
+        <target cname="WVE_21063497-0541534" targcat="WG.fits" targclass="STAR" targdec="-5.69817163351945" targepoch="2015.5" targid="WG_12278_759" targname="" targparal="1.5500368" targpmdec="-4.1032414" targpmra="-0.75798136" targprio="10.0" targprog="ANY" targra="316.64572703417946" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002520511" emag_g="" emag_gg="0.00047387846" emag_i="" emag_r="" emag_rp="0.0020208757" mag_bp="15.381032" mag_g="15.608396" mag_gg="14.827895" mag_i="14.464031" mag_r="14.744441" mag_rp="14.140541"/>
+        </target>
+        <target cname="WVE_21060013-0539414" targcat="WG.fits" targclass="STAR" targdec="-5.661495992010251" targepoch="2015.5" targid="WG_12278_661" targname="" targparal="1.2945074" targpmdec="2.9028685" targpmra="6.92219" targprio="10.0" targprog="LIFU" targra="316.5005566985133" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.012177131" emag_g="" emag_gg="0.0010432979" emag_i="" emag_r="" emag_rp="0.00599043" mag_bp="17.547274" mag_g="17.9441" mag_gg="16.789154" mag_i="16.28721" mag_r="16.743317" mag_rp="15.957147"/>
+        </target>
+        <target cname="WVE_21055356-0541029" targcat="WG.fits" targclass="STAR" targdec="-5.684145612119355" targepoch="2015.5" targid="WG_12278_637" targname="" targparal="1.0087948" targpmdec="-5.843605" targpmra="-4.6371946" targprio="10.0" targprog="ANY" targra="316.47317939462556" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0025949297" emag_g="" emag_gg="0.00043936024" emag_i="" emag_r="" emag_rp="0.0022741896" mag_bp="14.852564" mag_g="14.919263" mag_gg="14.518614" mag_i="15.174217" mag_r="14.481341" mag_rp="14.022808"/>
+        </target>
+        <target cname="WVE_21044886-0540505" targcat="WG.fits" targclass="STAR" targdec="-5.680701212393301" targepoch="2015.5" targid="WG_12278_435" targname="" targparal="0.8230481" targpmdec="-5.3499236" targpmra="1.1964943" targprio="10.0" targprog="ANY" targra="316.20356502702225" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0023382348" emag_g="" emag_gg="0.0006460674" emag_i="" emag_r="" emag_rp="0.0024780189" mag_bp="15.898617" mag_g="16.011013" mag_gg="15.463196" mag_i="15.202568" mag_r="15.3978405" mag_rp="14.876794"/>
+        </target>
+        <target cname="WVE_21051523-0540440" targcat="WG.fits" targclass="STAR" targdec="-5.678880181349058" targepoch="2015.5" targid="WG_12278_516" targname="" targparal="0.61010945" targpmdec="-0.3262649" targpmra="-8.409963" targprio="10.0" targprog="ANY" targra="316.3134666154725" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0043365387" emag_g="" emag_gg="0.0006896277" emag_i="" emag_r="" emag_rp="0.003610569" mag_bp="15.9588785" mag_g="16.052187" mag_gg="15.553278" mag_i="15.30119" mag_r="15.494462" mag_rp="14.989498"/>
+        </target>
+        <target cname="WVE_21052627-0542538" targcat="WG.fits" targclass="STAR" targdec="-5.714952803091745" targepoch="2015.5" targid="WG_12278_550" targname="" targparal="0.5178312" targpmdec="-2.2743838" targpmra="7.7992506" targprio="10.0" targprog="ANY" targra="316.3594728653473" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0018414865" emag_g="" emag_gg="0.0005074474" emag_i="" emag_r="" emag_rp="0.0011799599" mag_bp="15.121514" mag_g="15.169736" mag_gg="14.791485" mag_i="14.619906" mag_r="14.750963" mag_rp="14.298539"/>
+        </target>
+        <target cname="WVE_21054235-0544177" targcat="WG.fits" targclass="STAR" targdec="-5.738241241352277" targepoch="2015.5" targid="WG_12278_606" targname="" targparal="1.4063721" targpmdec="-3.7911105" targpmra="-6.7142806" targprio="10.0" targprog="ANY" targra="316.4264667494593" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.006220803" emag_g="" emag_gg="0.00082748634" emag_i="" emag_r="" emag_rp="0.0034499057" mag_bp="16.521076" mag_g="16.789396" mag_gg="15.909585" mag_i="15.504913" mag_r="15.833372" mag_rp="15.172454"/>
+        </target>
+        <target cname="WVE_21050589-0545097" targcat="WG.fits" targclass="STAR" targdec="-5.752695088494279" targepoch="2015.5" targid="WG_12278_491" targname="" targparal="1.2176418" targpmdec="-5.5299783" targpmra="3.4117532" targprio="10.0" targprog="ANY" targra="316.2745534759757" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004334596" emag_g="" emag_gg="0.0007558294" emag_i="" emag_r="" emag_rp="0.0022440495" mag_bp="16.191252" mag_g="16.324183" mag_gg="15.681323" mag_i="15.3437" mag_r="15.616341" mag_rp="15.036975"/>
+        </target>
+        <target cname="WVE_21054883-0544167" targcat="WG.fits" targclass="STAR" targdec="-5.7379807092179895" targepoch="2015.5" targid="WG_12278_625" targname="" targparal="1.652034" targpmdec="-9.530543" targpmra="0.7964075" targprio="10.0" targprog="ANY" targra="316.4534568053257" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0034924624" emag_g="" emag_gg="0.0005676532" emag_i="" emag_r="" emag_rp="0.0023572443" mag_bp="16.074562" mag_g="16.32499" mag_gg="15.504507" mag_i="15.110477" mag_r="15.434579" mag_rp="14.782755"/>
+        </target>
+        <target cname="WVE_21060993-0540200" targcat="WG.fits" targclass="STAR" targdec="-5.6722232553059895" targepoch="2015.5" targid="WG_12278_697" targname="" targparal="1.110046" targpmdec="-4.6369567" targpmra="8.501939" targprio="10.0" targprog="LIFU" targra="316.5413725119088" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009960675" emag_g="" emag_gg="0.00093618606" emag_i="" emag_r="" emag_rp="0.00479618" mag_bp="17.099169" mag_g="17.473862" mag_gg="16.404083" mag_i="15.934977" mag_r="16.35152" mag_rp="15.596662"/>
+        </target>
+        <target cname="WVE_21060792-0541227" targcat="WG.fits" targclass="STAR" targdec="-5.689648098208991" targepoch="2015.5" targid="WG_12278_690" targname="" targparal="3.0784037" targpmdec="1.2027082" targpmra="9.497675" targprio="10.0" targprog="LIFU" targra="316.53299724004444" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.033306554" emag_g="" emag_gg="0.0014794209" emag_i="" emag_r="" emag_rp="0.0043441732" mag_bp="18.703564" mag_g="19.28779" mag_gg="17.321918" mag_i="16.5839" mag_r="17.831299" mag_rp="16.149052"/>
+        </target>
+        <target cname="WVE_21070548-0532439" targcat="WG.fits" targclass="STAR" targdec="-5.54554039426269" targepoch="2015.5" targid="WG_12278_862" targname="" targparal="0.82695866" targpmdec="0.5728586" targpmra="0.6424387" targprio="10.0" targprog="ANY" targra="316.7728490725672" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004571167" emag_g="" emag_gg="0.0006493671" emag_i="" emag_r="" emag_rp="0.0028289123" mag_bp="16.312254" mag_g="16.520535" mag_gg="15.788163" mag_i="15.455165" mag_r="15.722313" mag_rp="15.119931"/>
+        </target>
+        <target cname="WVE_21044931-0541558" targcat="WG.fits" targclass="STAR" targdec="-5.698819568446456" targepoch="2015.5" targid="WG_12278_439" targname="" targparal="1.1661867" targpmdec="-1.5356632" targpmra="-0.20825061" targprio="10.0" targprog="ANY" targra="316.2054756922704" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004211847" emag_g="" emag_gg="0.0006006891" emag_i="" emag_r="" emag_rp="0.0030399028" mag_bp="16.046803" mag_g="16.20792" mag_gg="15.543355" mag_i="15.218984" mag_r="15.47285" mag_rp="14.900799"/>
+        </target>
+        <target cname="WVE_21061080-0543114" targcat="WG.fits" targclass="STAR" targdec="-5.719828118868555" targepoch="2015.5" targid="WG_12278_700" targname="" targparal="1.1201816" targpmdec="-0.6254815" targpmra="4.3624177" targprio="10.0" targprog="ANY" targra="316.54501465203293" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.003202779" emag_g="" emag_gg="0.00066232414" emag_i="" emag_r="" emag_rp="0.0029258183" mag_bp="15.880062" mag_g="16.123665" mag_gg="15.311779" mag_i="14.932082" mag_r="15.251745" mag_rp="14.604729"/>
+        </target>
+        <target cname="WVE_21045769-0544432" targcat="WG.fits" targclass="STAR" targdec="-5.745343316542062" targepoch="2015.5" targid="WG_12278_469" targname="" targparal="0.64604974" targpmdec="-0.54860187" targpmra="-2.7182002" targprio="10.0" targprog="ANY" targra="316.24035477314357" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002817704" emag_g="" emag_gg="0.00042818981" emag_i="" emag_r="" emag_rp="0.003239024" mag_bp="15.155405" mag_g="15.209161" mag_gg="14.840578" mag_i="14.660124" mag_r="14.805418" mag_rp="14.329244"/>
+        </target>
+        <target cname="WVE_21084440-0432514" targcat="WG.fits" targclass="STAR" targdec="-4.547610081434596" targepoch="2015.5" targid="WG_12278_1052" targname="" targparal="0.99419636" targpmdec="1.1682636" targpmra="0.07101102" targprio="10.0" targprog="ANY" targra="317.1850121448072" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0042414917" emag_g="" emag_gg="0.00060106214" emag_i="" emag_r="" emag_rp="0.0031634886" mag_bp="16.044806" mag_g="16.187336" mag_gg="15.584843" mag_i="15.296371" mag_r="15.514177" mag_rp="14.9804"/>
+        </target>
+        <target cname="WVE_21084313-0432207" targcat="WG.fits" targclass="STAR" targdec="-4.539076569616473" targepoch="2015.5" targid="WG_12278_1050" targname="" targparal="1.1949315" targpmdec="-4.4605784" targpmra="-3.5573514" targprio="10.0" targprog="ANY" targra="317.17970326893413" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.003728841" emag_g="" emag_gg="0.0003817459" emag_i="" emag_r="" emag_rp="0.0023441277" mag_bp="15.397965" mag_g="15.544651" mag_gg="14.94633" mag_i="14.661328" mag_r="14.89036" mag_rp="14.3474"/>
+        </target>
+        <target cname="WVE_21085447-0443475" targcat="WG.fits" targclass="STAR" targdec="-4.7298656822860226" targepoch="2015.5" targid="WG_12278_1067" targname="" targparal="1.027418" targpmdec="-4.0584164" targpmra="-1.1946595" targprio="10.0" targprog="LIFU" targra="317.22695363841916" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0069451993" emag_g="" emag_gg="0.00081347465" emag_i="" emag_r="" emag_rp="0.0031580604" mag_bp="17.187891" mag_g="17.461365" mag_gg="16.572231" mag_i="16.178226" mag_r="16.50137" mag_rp="15.835454"/>
+        </target>
+        <target cname="WVE_21084467-0444012" targcat="WG.fits" targclass="STAR" targdec="-4.733654518456385" targepoch="2015.5" targid="WG_12278_1053" targname="" targparal="1.2230462" targpmdec="0.21953443" targpmra="-0.9121927" targprio="10.0" targprog="ANY" targra="317.18611498937486" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004901829" emag_g="" emag_gg="0.0007281798" emag_i="" emag_r="" emag_rp="0.0031194526" mag_bp="15.983224" mag_g="16.193483" mag_gg="15.467684" mag_i="15.127019" mag_r="15.407458" mag_rp="14.802782"/>
+        </target>
+        <target cname="WVE_21085426-0432059" targcat="WG.fits" targclass="STAR" targdec="-4.5349832998000865" targepoch="2015.5" targid="WG_12278_1066" targname="" targparal="1.6887149" targpmdec="-5.2936068" targpmra="-3.2461543" targprio="10.0" targprog="LIFU" targra="317.2260805015611" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0069338544" emag_g="" emag_gg="0.00078653556" emag_i="" emag_r="" emag_rp="0.0038798735" mag_bp="16.947584" mag_g="" mag_gg="16.145365" mag_i="" mag_r="" mag_rp="15.275787"/>
+        </target>
+        <target cname="WVE_21084917-0443095" targcat="WG.fits" targclass="STAR" targdec="-4.719302555669611" targepoch="2015.5" targid="WG_12278_1060" targname="" targparal="0.5383207" targpmdec="-5.9060974" targpmra="6.069267" targprio="10.0" targprog="ANY" targra="317.2048931949803" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004096095" emag_g="" emag_gg="0.00061681384" emag_i="" emag_r="" emag_rp="0.0019174295" mag_bp="15.872758" mag_g="16.029902" mag_gg="15.428945" mag_i="15.15631" mag_r="15.376713" mag_rp="14.825449"/>
+        </target>
+        <target cname="WVE_21084346-0428557" targcat="WG.fits" targclass="STAR" targdec="-4.482129172719154" targepoch="2015.5" targid="WG_12278_1051" targname="" targparal="0.9912046" targpmdec="-0.15575805" targpmra="-9.225806" targprio="10.0" targprog="ANY" targra="317.1810940000828" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0032008216" emag_g="" emag_gg="0.00055082823" emag_i="" emag_r="" emag_rp="0.0037517902" mag_bp="15.697611" mag_g="15.8321295" mag_gg="15.273483" mag_i="15.010054" mag_r="15.228949" mag_rp="14.688332"/>
+        </target>
+        <target cname="WVE_21085657-0432214" targcat="WG.fits" targclass="STAR" targdec="-4.539287623446867" targepoch="2015.5" targid="WG_12278_1070" targname="" targparal="1.7131984" targpmdec="6.0615125" targpmra="-7.868514" targprio="10.0" targprog="LIFU" targra="317.23568944241947" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.009615422" emag_g="" emag_gg="0.000935872" emag_i="" emag_r="" emag_rp="0.002419065" mag_bp="17.379148" mag_g="" mag_gg="16.345098" mag_i="" mag_r="" mag_rp="15.339329"/>
+        </target>
+        <target cname="WVE_21084084-0451297" targcat="WG.fits" targclass="STAR" targdec="-4.858240798101142" targepoch="2015.5" targid="WG_12278_1047" targname="" targparal="0.8694151" targpmdec="-5.097394" targpmra="6.752589" targprio="10.0" targprog="ANY" targra="317.1701793925374" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0029738208" emag_g="" emag_gg="0.0004942577" emag_i="" emag_r="" emag_rp="0.0016742838" mag_bp="15.488489" mag_g="" mag_gg="15.079537" mag_i="" mag_r="" mag_rp="14.5014105"/>
+        </target>
+        <target cname="WVE_21083795-0432109" targcat="WG.fits" targclass="STAR" targdec="-4.536367821081387" targepoch="2015.5" targid="WG_12278_1043" targname="" targparal="0.5600804" targpmdec="-3.5432868" targpmra="7.00363" targprio="10.0" targprog="ANY" targra="317.15813159357236" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0020703555" emag_g="" emag_gg="0.00044702733" emag_i="" emag_r="" emag_rp="0.0020210159" mag_bp="15.536484" mag_g="15.65797" mag_gg="15.134949" mag_i="14.873748" mag_r="15.099774" mag_rp="14.571078"/>
+        </target>
+        <target cname="WVE_21085733-0450104" targcat="WG.fits" targclass="STAR" targdec="-4.836232048521114" targepoch="2015.5" targid="WG_12278_1072" targname="" targparal="4.274861" targpmdec="4.5264997" targpmra="-6.725331" targprio="10.0" targprog="LIFU" targra="317.2388748721879" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.021206537" emag_g="" emag_gg="0.0010095944" emag_i="" emag_r="" emag_rp="0.00253711" mag_bp="17.652561" mag_g="18.226059" mag_gg="16.330095" mag_i="15.591742" mag_r="16.824083" mag_rp="15.172592"/>
+        </target>
+        <target cname="WVE_21085700-0446263" targcat="WG.fits" targclass="STAR" targdec="-4.773977826760883" targepoch="2015.5" targid="WG_12278_1071" targname="" targparal="1.5969852" targpmdec="-7.0707264" targpmra="1.3866793" targprio="10.0" targprog="LIFU" targra="317.23748135999307" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0168133" emag_g="" emag_gg="0.0013756744" emag_i="" emag_r="" emag_rp="0.00783055" mag_bp="18.466679" mag_g="19.093447" mag_gg="17.450535" mag_i="16.81909" mag_r="17.54565" mag_rp="16.438787"/>
+        </target>
+        <target cname="WVE_21082509-0506593" targcat="WG.fits" targclass="STAR" targdec="-5.116467597618415" targepoch="2015.5" targid="WG_12278_1020" targname="" targparal="0.8789621" targpmdec="5.638106" targpmra="4.911592" targprio="10.0" targprog="ANY" targra="317.10453738478174" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0072200675" emag_g="" emag_gg="0.0006520319" emag_i="" emag_r="" emag_rp="0.0029198937" mag_bp="16.28211" mag_g="" mag_gg="15.805473" mag_i="" mag_r="" mag_rp="15.164061"/>
+        </target>
+        <target cname="WVE_21083998-0420548" targcat="WG.fits" targclass="STAR" targdec="-4.34855663317338" targepoch="2015.5" targid="WG_12278_1045" targname="" targparal="1.2118919" targpmdec="2.083075" targpmra="-0.7825602" targprio="10.0" targprog="LIFU" targra="317.1665750002951" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.012778536" emag_g="" emag_gg="0.001178419" emag_i="" emag_r="" emag_rp="0.0062938374" mag_bp="18.079182" mag_g="" mag_gg="17.207897" mag_i="" mag_r="" mag_rp="16.292046"/>
+        </target>
+        <target cname="WVE_21082982-0429129" targcat="WG.fits" targclass="STAR" targdec="-4.486908516997098" targepoch="2015.5" targid="WG_12278_1031" targname="" targparal="0.74012357" targpmdec="-1.0807848" targpmra="3.7742982" targprio="10.0" targprog="LIFU" targra="317.12422973542743" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007825833" emag_g="" emag_gg="0.0008987147" emag_i="" emag_r="" emag_rp="0.0037829075" mag_bp="16.83092" mag_g="17.008823" mag_gg="16.335665" mag_i="16.000858" mag_r="16.302351" mag_rp="15.687164"/>
+        </target>
+        <target cname="WVE_21081469-0515559" targcat="WG.fits" targclass="STAR" targdec="-5.265523535310516" targepoch="2015.5" targid="WG_12278_999" targname="" targparal="1.4171662" targpmdec="-2.8797429" targpmra="-2.4621842" targprio="10.0" targprog="LIFU" targra="317.0611908138231" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0072087967" emag_g="" emag_gg="0.0009890131" emag_i="" emag_r="" emag_rp="0.0031386802" mag_bp="17.139364" mag_g="" mag_gg="16.370306" mag_i="" mag_r="" mag_rp="15.516946"/>
+        </target>
+        <target cname="WVE_21082204-0423382" targcat="WG.fits" targclass="STAR" targdec="-4.393950481144713" targepoch="2015.5" targid="WG_12278_1012" targname="" targparal="1.4370764" targpmdec="-4.552892" targpmra="0.42949998" targprio="10.0" targprog="LIFU" targra="317.09183830639887" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.010515257" emag_g="" emag_gg="0.0012917623" emag_i="" emag_r="" emag_rp="0.0040960056" mag_bp="17.733854" mag_g="" mag_gg="16.971165" mag_i="" mag_r="" mag_rp="16.097174"/>
+        </target>
+        <target cname="WVE_21082449-0414544" targcat="WG.fits" targclass="STAR" targdec="-4.248448480986432" targepoch="2015.5" targid="WG_12278_1018" targname="" targparal="1.2947576" targpmdec="-2.1635802" targpmra="-2.158897" targprio="10.0" targprog="LIFU" targra="317.10205454671404" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007005114" emag_g="" emag_gg="0.00089091645" emag_i="" emag_r="" emag_rp="0.004436819" mag_bp="17.23265" mag_g="" mag_gg="16.554802" mag_i="" mag_r="" mag_rp="15.743521"/>
+        </target>
+        <target cname="WVE_21082569-0513126" targcat="WG.fits" targclass="STAR" targdec="-5.2201584219347925" targepoch="2015.5" targid="WG_12278_1022" targname="" targparal="2.7306628" targpmdec="1.2131944" targpmra="0.9356009" targprio="10.0" targprog="LIFU" targra="317.1070371197963" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.04897978" emag_g="" emag_gg="0.0016128342" emag_i="" emag_r="" emag_rp="0.006051384" mag_bp="18.22777" mag_g="" mag_gg="17.076748" mag_i="" mag_r="" mag_rp="15.974913"/>
+        </target>
+        <target cname="WVE_21082609-0418035" targcat="WG.fits" targclass="STAR" targdec="-4.300983647199309" targepoch="2015.5" targid="WG_12278_1024" targname="" targparal="1.1883999" targpmdec="-5.3734064" targpmra="0.5822275" targprio="10.0" targprog="LIFU" targra="317.1087042739551" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.008419271" emag_g="" emag_gg="0.0008769369" emag_i="" emag_r="" emag_rp="0.0032503062" mag_bp="16.950481" mag_g="" mag_gg="16.330141" mag_i="" mag_r="" mag_rp="15.580928"/>
+        </target>
+        <target cname="WVE_21082374-0511294" targcat="WG.fits" targclass="STAR" targdec="-5.191512968416748" targepoch="2015.5" targid="WG_12278_1016" targname="" targparal="0.66693133" targpmdec="-0.79566157" targpmra="6.331057" targprio="10.0" targprog="ANY" targra="317.09890983644107" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004857065" emag_g="" emag_gg="0.00059779675" emag_i="" emag_r="" emag_rp="0.0016082203" mag_bp="15.636151" mag_g="" mag_gg="15.2494135" mag_i="" mag_r="" mag_rp="14.69895"/>
+        </target>
+        <target cname="WVE_21081906-0419251" targcat="WG.fits" targclass="STAR" targdec="-4.323639854008929" targepoch="2015.5" targid="WG_12278_1008" targname="" targparal="2.2476876" targpmdec="-2.2672744" targpmra="3.3671765" targprio="10.0" targprog="ANY" targra="317.0794033216156" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0045610717" emag_g="" emag_gg="0.00069366826" emag_i="" emag_r="" emag_rp="0.0022841324" mag_bp="16.767427" mag_g="" mag_gg="15.865945" mag_i="" mag_r="" mag_rp="14.926246"/>
+        </target>
+        <target cname="WVE_21083339-0511218" targcat="WG.fits" targclass="STAR" targdec="-5.189381488377732" targepoch="2015.5" targid="WG_12278_1036" targname="" targparal="0.7798499" targpmdec="-8.210062" targpmra="5.022662" targprio="10.0" targprog="ANY" targra="317.1391155618829" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.008646624" emag_g="" emag_gg="0.0008102871" emag_i="" emag_r="" emag_rp="0.0046210154" mag_bp="16.254618" mag_g="" mag_gg="15.821993" mag_i="" mag_r="" mag_rp="15.22168"/>
+        </target>
+        <target cname="WVE_21082167-0513591" targcat="WG.fits" targclass="STAR" targdec="-5.233091196483596" targepoch="2015.5" targid="WG_12278_1011" targname="" targparal="0.8218181" targpmdec="-6.852781" targpmra="-5.078838" targprio="10.0" targprog="ANY" targra="317.09027418009896" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0071530566" emag_g="" emag_gg="0.0006788095" emag_i="" emag_r="" emag_rp="0.0030380513" mag_bp="15.695651" mag_g="15.79128" mag_gg="15.333721" mag_i="15.139049" mag_r="15.298239" mag_rp="14.786188"/>
+        </target>
+        <target cname="WVE_21082520-0511166" targcat="WG.fits" targclass="STAR" targdec="-5.187953992935743" targepoch="2015.5" targid="WG_12278_1021" targname="" targparal="1.9419603" targpmdec="-2.9877636" targpmra="7.5825315" targprio="10.0" targprog="LIFU" targra="317.1049936319181" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.027585592" emag_g="" emag_gg="0.0016890767" emag_i="" emag_r="" emag_rp="0.0043384936" mag_bp="17.692768" mag_g="" mag_gg="16.602146" mag_i="" mag_r="" mag_rp="15.545189"/>
+        </target>
+        <target cname="WVE_21083122-0513404" targcat="WG.fits" targclass="STAR" targdec="-5.227891537198911" targepoch="2015.5" targid="WG_12278_1033" targname="" targparal="0.61385196" targpmdec="-0.74406147" targpmra="-3.4019034" targprio="10.0" targprog="ANY" targra="317.13007400680067" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0036672046" emag_g="" emag_gg="0.0004942427" emag_i="" emag_r="" emag_rp="0.0021122582" mag_bp="15.428875" mag_g="" mag_gg="15.033164" mag_i="" mag_r="" mag_rp="14.469511"/>
+        </target>
+        <target cname="WVE_21081213-0419141" targcat="WG.fits" targclass="STAR" targdec="-4.320594252267031" targepoch="2015.5" targid="WG_12278_994" targname="" targparal="1.142833" targpmdec="-2.4201043" targpmra="-4.2462864" targprio="10.0" targprog="ANY" targra="317.0505527972642" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0050204396" emag_g="" emag_gg="0.0006932619" emag_i="" emag_r="" emag_rp="0.0015178715" mag_bp="16.441454" mag_g="16.675531" mag_gg="15.858851" mag_i="15.473867" mag_r="15.850922" mag_rp="15.136652"/>
+        </target>
+        <target cname="WVE_21085344-0455468" targcat="WG.fits" targclass="STAR" targdec="-4.929662755716576" targepoch="2015.5" targid="WG_12278_1065" targname="" targparal="0.77912086" targpmdec="-8.372551" targpmra="-1.9778731" targprio="10.0" targprog="ANY" targra="317.2226543860791" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004391914" emag_g="" emag_gg="0.0006679027" emag_i="" emag_r="" emag_rp="0.003117042" mag_bp="16.251417" mag_g="" mag_gg="15.751045" mag_i="" mag_r="" mag_rp="15.092558"/>
+        </target>
+        <target cname="WVE_21081157-0518271" targcat="WG.fits" targclass="STAR" targdec="-5.307519827171273" targepoch="2015.5" targid="WG_12278_992" targname="" targparal="1.0421551" targpmdec="-3.3853815" targpmra="-2.3336284" targprio="10.0" targprog="ANY" targra="317.0481949336621" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0015852498" emag_g="" emag_gg="0.00033135872" emag_i="" emag_r="" emag_rp="0.003129755" mag_bp="14.913214" mag_g="" mag_gg="14.532033" mag_i="" mag_r="" mag_rp="13.982713"/>
+        </target>
+        <target cname="WVE_21085991-0456212" targcat="WG.fits" targclass="STAR" targdec="-4.939230015221131" targepoch="2015.5" targid="WG_12278_1074" targname="" targparal="0.77886593" targpmdec="-4.6806164" targpmra="0.5449238" targprio="10.0" targprog="LIFU" targra="317.2496214449836" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0122887" emag_g="" emag_gg="0.0007793417" emag_i="" emag_r="" emag_rp="0.005288741" mag_bp="16.636597" mag_g="" mag_gg="16.14983" mag_i="" mag_r="" mag_rp="15.492411"/>
+        </target>
+        <target cname="WVE_21083598-0501495" targcat="WG.fits" targclass="STAR" targdec="-5.03042771931606" targepoch="2015.5" targid="WG_12278_1041" targname="" targparal="0.7349779" targpmdec="-4.482189" targpmra="5.508399" targprio="10.0" targprog="ANY" targra="317.14992577681835" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004032331" emag_g="" emag_gg="0.0005872036" emag_i="" emag_r="" emag_rp="0.0025897094" mag_bp="15.780604" mag_g="" mag_gg="15.412475" mag_i="" mag_r="" mag_rp="14.872635"/>
+        </target>
+        <target cname="WVE_21083435-0426453" targcat="WG.fits" targclass="STAR" targdec="-4.445917705150922" targepoch="2015.5" targid="WG_12278_1038" targname="" targparal="0.7321506" targpmdec="-0.2409887" targpmra="6.9264727" targprio="10.0" targprog="ANY" targra="317.1431237309607" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0028450964" emag_g="" emag_gg="0.0008074283" emag_i="" emag_r="" emag_rp="0.0034209443" mag_bp="16.258602" mag_g="16.36946" mag_gg="15.867424" mag_i="15.60698" mag_r="15.836392" mag_rp="15.309159"/>
+        </target>
+        <target cname="WVE_21085497-0440078" targcat="WG.fits" targclass="STAR" targdec="-4.6688304669313565" targepoch="2015.5" targid="WG_12278_1068" targname="" targparal="0.7592709" targpmdec="1.7633368" targpmra="-0.86587447" targprio="10.0" targprog="ANY" targra="317.2290427773882" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0030260286" emag_g="" emag_gg="0.00044060664" emag_i="" emag_r="" emag_rp="0.0022812341" mag_bp="15.539734" mag_g="15.644987" mag_gg="15.148" mag_i="14.921831" mag_r="15.10456" mag_rp="14.582141"/>
+        </target>
+        <target cname="WVE_21085038-0426599" targcat="WG.fits" targclass="STAR" targdec="-4.449977637429825" targepoch="2015.5" targid="WG_12278_1061" targname="" targparal="0.8478995" targpmdec="-6.0919137" targpmra="-6.3978434" targprio="10.0" targprog="ANY" targra="317.20992864555853" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0027399436" emag_g="" emag_gg="0.00033293452" emag_i="" emag_r="" emag_rp="0.0019888862" mag_bp="15.308953" mag_g="15.441863" mag_gg="14.890851" mag_i="14.630547" mag_r="14.852743" mag_rp="14.311802"/>
+        </target>
+        <target cname="WVE_21084671-0437083" targcat="WG.fits" targclass="STAR" targdec="-4.618964904935757" targepoch="2015.5" targid="WG_12278_1059" targname="" targparal="1.3183048" targpmdec="-3.4026883" targpmra="9.20721" targprio="10.0" targprog="LIFU" targra="317.1946406243081" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.01129801" emag_g="" emag_gg="0.0006992146" emag_i="" emag_r="" emag_rp="0.0029803815" mag_bp="16.977282" mag_g="17.355831" mag_gg="16.278011" mag_i="15.8123455" mag_r="16.23729" mag_rp="15.472323"/>
+        </target>
+        <target cname="WVE_21090119-0451088" targcat="WG.fits" targclass="STAR" targdec="-4.8524407297101515" targepoch="2015.5" targid="WG_12278_1075" targname="" targparal="0.7824928" targpmdec="-9.578467" targpmra="2.2395163" targprio="10.0" targprog="ANY" targra="317.25497519390905" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0030232756" emag_g="" emag_gg="0.00038708016" emag_i="" emag_r="" emag_rp="0.0017585781" mag_bp="15.392116" mag_g="" mag_gg="14.979476" mag_i="" mag_r="" mag_rp="14.39862"/>
+        </target>
+        <target cname="WVE_21090383-0446233" targcat="WG.fits" targclass="STAR" targdec="-4.773126641222197" targepoch="2015.5" targid="WG_12278_1076" targname="" targparal="1.3829722" targpmdec="-7.3495135" targpmra="-2.2831862" targprio="10.0" targprog="LIFU" targra="317.26597528519164" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0054016057" emag_g="" emag_gg="0.00082051917" emag_i="" emag_r="" emag_rp="0.0039770296" mag_bp="17.236273" mag_g="17.626741" mag_gg="16.476698" mag_i="16.01377" mag_r="16.452028" mag_rp="15.623125"/>
+        </target>
+        <target cname="WVE_21085232-0438021" targcat="WG.fits" targclass="STAR" targdec="-4.633913703476947" targepoch="2015.5" targid="WG_12278_1064" targname="" targparal="1.0707942" targpmdec="-6.7009225" targpmra="-1.5730479" targprio="10.0" targprog="LIFU" targra="317.2180046160169" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0040146746" emag_g="" emag_gg="0.0011425427" emag_i="" emag_r="" emag_rp="0.0028649445" mag_bp="16.606478" mag_g="" mag_gg="16.163895" mag_i="" mag_r="" mag_rp="15.53048"/>
+        </target>
+        <target cname="WVE_21084302-0437559" targcat="WG.fits" targclass="STAR" targdec="-4.63218307897475" targepoch="2015.5" targid="WG_12278_1049" targname="" targparal="0.5371728" targpmdec="-3.4292724" targpmra="5.071685" targprio="10.0" targprog="ANY" targra="317.1792425463354" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0028306046" emag_g="" emag_gg="0.0004722611" emag_i="" emag_r="" emag_rp="0.002963005" mag_bp="15.769356" mag_g="" mag_gg="15.360735" mag_i="" mag_r="" mag_rp="14.773171"/>
+        </target>
+        <target cname="WVE_21084652-0430386" targcat="WG.fits" targclass="STAR" targdec="-4.510723761389837" targepoch="2015.5" targid="WG_12278_1057" targname="" targparal="0.7305226" targpmdec="-5.291977" targpmra="3.3902657" targprio="10.0" targprog="ANY" targra="317.1938366567789" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.001947568" emag_g="" emag_gg="0.00035300406" emag_i="" emag_r="" emag_rp="0.0022085859" mag_bp="15.203259" mag_g="" mag_gg="14.750164" mag_i="" mag_r="" mag_rp="14.156516"/>
+        </target>
+        <target cname="WVE_21084084-0432481" targcat="WG.fits" targclass="STAR" targdec="-4.5466915548113835" targepoch="2015.5" targid="WG_12278_1046" targname="" targparal="0.44851083" targpmdec="-8.904115" targpmra="-2.0991573" targprio="10.0" targprog="ANY" targra="317.1701788046911" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0017394456" emag_g="" emag_gg="0.00036335483" emag_i="" emag_r="" emag_rp="0.0024379988" mag_bp="15.15158" mag_g="15.339233" mag_gg="14.652356" mag_i="14.320925" mag_r="14.604577" mag_rp="14.00543"/>
+        </target>
+        <target cname="WVE_21084624-0431389" targcat="WG.fits" targclass="STAR" targdec="-4.527462717228148" targepoch="2015.5" targid="WG_12278_1056" targname="" targparal="1.2700479" targpmdec="-5.7643366" targpmra="-5.8592377" targprio="10.0" targprog="ANY" targra="317.1926824903525" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002857211" emag_g="" emag_gg="0.00086175057" emag_i="" emag_r="" emag_rp="0.003641824" mag_bp="16.354921" mag_g="16.662268" mag_gg="15.738824" mag_i="15.317533" mag_r="15.677776" mag_rp="14.975826"/>
+        </target>
+        <target cname="WVE_21013710-0420010" targcat="WG.fits" targclass="STAR" targdec="-4.333622957875946" targepoch="2015.5" targid="WG_12284_936" targname="" targparal="0.72650295" targpmdec="-7.610863" targpmra="6.1698437" targprio="10.0" targprog="ANY" targra="315.40458203347913" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0019531413" emag_g="" emag_gg="0.0003887653" emag_i="" emag_r="" emag_rp="0.001843673" mag_bp="15.189806" mag_g="15.289809" mag_gg="14.76799" mag_i="14.512015" mag_r="14.724628" mag_rp="14.201385"/>
+        </target>
+        <target cname="WVE_21020650-0415151" targcat="WG.fits" targclass="STAR" targdec="-4.254181095393445" targepoch="2015.5" targid="WG_12284_1024" targname="" targparal="0.8327627" targpmdec="-1.9408398" targpmra="-0.6039208" targprio="10.0" targprog="ANY" targra="315.52709875959044" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.004338149" emag_g="" emag_gg="0.0005096798" emag_i="" emag_r="" emag_rp="0.0014967113" mag_bp="15.380554" mag_g="" mag_gg="15.020079" mag_i="" mag_r="" mag_rp="14.493398"/>
+        </target>
+        <target cname="WVE_21021756-0406179" targcat="WG.fits" targclass="STAR" targdec="-4.104977421105352" targepoch="2015.5" targid="WG_12284_1047" targname="" targparal="0.9032695" targpmdec="-5.768069" targpmra="-0.8566032" targprio="10.0" targprog="ANY" targra="315.57317269326575" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0025918968" emag_g="" emag_gg="0.00044397044" emag_i="" emag_r="" emag_rp="0.0012524514" mag_bp="15.148836" mag_g="15.249186" mag_gg="14.780886" mag_i="14.570358" mag_r="14.737894" mag_rp="14.247222"/>
+        </target>
+        <target cname="WVE_21030403-0359312" targcat="WG.fits" targclass="STAR" targdec="-3.9919922603259854" targepoch="2015.5" targid="WG_12284_1134" targname="" targparal="0.95838416" targpmdec="-3.0736287" targpmra="-1.8763144" targprio="10.0" targprog="LIFU" targra="315.7668099411107" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.014664419" emag_g="" emag_gg="0.0009241735" emag_i="" emag_r="" emag_rp="0.0020241598" mag_bp="16.680103" mag_g="" mag_gg="16.134544" mag_i="" mag_r="" mag_rp="15.440805"/>
+        </target>
+        <target cname="WVE_21025172-0359075" targcat="WG.fits" targclass="STAR" targdec="-3.9854152613566693" targepoch="2015.5" targid="WG_12284_1113" targname="" targparal="1.3185319" targpmdec="-3.483027" targpmra="7.6421566" targprio="10.0" targprog="LIFU" targra="315.71550288177554" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0075090807" emag_g="" emag_gg="0.0010036395" emag_i="" emag_r="" emag_rp="0.006612583" mag_bp="17.365013" mag_g="" mag_gg="16.6453" mag_i="" mag_r="" mag_rp="15.826787"/>
+        </target>
+        <target cname="WVE_21042952-0349145" targcat="WG.fits" targclass="STAR" targdec="-3.8206860496141903" targepoch="2015.5" targid="WG_12284_1215" targname="" targparal="0.81780934" targpmdec="5.113015" targpmra="1.7711453" targprio="10.0" targprog="LIFU" targra="316.1229835344875" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0055001746" emag_g="" emag_gg="0.0009189301" emag_i="" emag_r="" emag_rp="0.0067395023" mag_bp="16.62828" mag_g="16.851498" mag_gg="16.069418" mag_i="15.679178" mag_r="16.012373" mag_rp="15.345597"/>
+        </target>
+        <target cname="WVE_21014181-0415262" targcat="WG.fits" targclass="STAR" targdec="-4.257284892684929" targepoch="2015.5" targid="WG_12284_954" targname="" targparal="0.50509137" targpmdec="-2.1951745" targpmra="4.9457297" targprio="10.0" targprog="ANY" targra="315.42418805662567" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0046280883" emag_g="" emag_gg="0.00054561184" emag_i="" emag_r="" emag_rp="0.0020284131" mag_bp="15.4193" mag_g="15.47286" mag_gg="15.10398" mag_i="14.924767" mag_r="15.09152" mag_rp="14.61865"/>
+        </target>
+        <target cname="WVE_21033128-0358156" targcat="WG.fits" targclass="STAR" targdec="-3.9709937056241937" targepoch="2015.5" targid="WG_12284_1166" targname="" targparal="1.7761415" targpmdec="-8.761892" targpmra="2.4629307" targprio="10.0" targprog="LIFU" targra="315.8803534674203" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.043773226" emag_g="" emag_gg="0.0018504013" emag_i="" emag_r="" emag_rp="0.0062750597" mag_bp="19.072603" mag_g="19.656654" mag_gg="17.958897" mag_i="17.26327" mag_r="18.225271" mag_rp="16.899263"/>
+        </target>
+        <target cname="WVE_21021953-0410317" targcat="WG.fits" targclass="STAR" targdec="-4.175469228113748" targepoch="2015.5" targid="WG_12284_1050" targname="" targparal="1.0317776" targpmdec="-0.28296334" targpmra="0.37531802" targprio="10.0" targprog="ANY" targra="315.5813841483928" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.005645118" emag_g="" emag_gg="0.0006157196" emag_i="" emag_r="" emag_rp="0.0030934857" mag_bp="15.808103" mag_g="15.947371" mag_gg="15.342588" mag_i="15.052925" mag_r="15.274947" mag_rp="14.733274"/>
+        </target>
+        <target cname="WVE_21014346-0417012" targcat="WG.fits" targclass="STAR" targdec="-4.283671314792628" targepoch="2015.5" targid="WG_12284_961" targname="" targparal="0.75696236" targpmdec="-4.6659026" targpmra="2.3643448" targprio="10.0" targprog="ANY" targra="315.4310700884087" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.005614632" emag_g="" emag_gg="0.0005990923" emag_i="" emag_r="" emag_rp="0.0030976497" mag_bp="16.01508" mag_g="16.1285" mag_gg="15.599852" mag_i="15.342013" mag_r="15.552795" mag_rp="15.0244055"/>
+        </target>
+        <target cname="WVE_21015493-0415259" targcat="WG.fits" targclass="STAR" targdec="-4.257201854185625" targepoch="2015.5" targid="WG_12284_992" targname="" targparal="0.7176649" targpmdec="0.03124958" targpmra="-1.5128243" targprio="10.0" targprog="ANY" targra="315.4788781671132" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0042598117" emag_g="" emag_gg="0.0005268674" emag_i="" emag_r="" emag_rp="0.0036344782" mag_bp="15.07947" mag_g="15.152033" mag_gg="14.752762" mag_i="14.591869" mag_r="14.73724" mag_rp="14.2658415"/>
+        </target>
+        <target cname="WVE_21014319-0418305" targcat="WG.fits" targclass="STAR" targdec="-4.308466923881272" targepoch="2015.5" targid="WG_12284_959" targname="" targparal="0.909963" targpmdec="-9.016828" targpmra="4.2051826" targprio="10.0" targprog="ANY" targra="315.4299461234342" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0063503813" emag_g="" emag_gg="0.00063893537" emag_i="" emag_r="" emag_rp="0.0022856344" mag_bp="16.153442" mag_g="16.213316" mag_gg="15.754833" mag_i="15.472206" mag_r="15.749066" mag_rp="15.19113"/>
+        </target>
+        <target cname="WVE_21012203-0427174" targcat="WG.fits" targclass="STAR" targdec="-4.454831868899208" targepoch="2015.5" targid="WG_12284_906" targname="" targparal="1.1614257" targpmdec="-7.8361874" targpmra="-1.228998" targprio="10.0" targprog="ANY" targra="315.3417906740449" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0061233686" emag_g="" emag_gg="0.00048942346" emag_i="" emag_r="" emag_rp="0.002635469" mag_bp="16.225845" mag_g="" mag_gg="15.636436" mag_i="" mag_r="" mag_rp="14.906339"/>
+        </target>
+        <target cname="WVE_21013762-0421515" targcat="WG.fits" targclass="STAR" targdec="-4.364316636720042" targepoch="2015.5" targid="WG_12284_937" targname="" targparal="0.95121247" targpmdec="-0.06723245" targpmra="-3.659783" targprio="10.0" targprog="ANY" targra="315.40673934570435" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0045879707" emag_g="" emag_gg="0.00046806954" emag_i="" emag_r="" emag_rp="0.0026893823" mag_bp="15.745227" mag_g="15.856978" mag_gg="15.341041" mag_i="15.094147" mag_r="15.316282" mag_rp="14.7679205"/>
+        </target>
+        <target cname="WVE_21014985-0416412" targcat="WG.fits" targclass="STAR" targdec="-4.278124392977182" targepoch="2015.5" targid="WG_12284_977" targname="" targparal="0.9667523" targpmdec="-1.9880497" targpmra="4.8472095" targprio="10.0" targprog="LIFU" targra="315.4576944485183" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007374964" emag_g="" emag_gg="0.000969484" emag_i="" emag_r="" emag_rp="0.0028421725" mag_bp="16.464426" mag_g="16.594454" mag_gg="16.015219" mag_i="15.7463" mag_r="16.003614" mag_rp="15.406971"/>
+        </target>
+        <target cname="WVE_21014276-0421007" targcat="WG.fits" targclass="STAR" targdec="-4.350199106116999" targepoch="2015.5" targid="WG_12284_958" targname="" targparal="0.58159757" targpmdec="-2.5262876" targpmra="0.055171825" targprio="10.0" targprog="ANY" targra="315.4281486885898" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0052897967" emag_g="" emag_gg="0.0005231135" emag_i="" emag_r="" emag_rp="0.0028277708" mag_bp="15.710162" mag_g="15.80018" mag_gg="15.320551" mag_i="15.084274" mag_r="15.292818" mag_rp="14.769527"/>
+        </target>
+        <target cname="WVE_21014033-0421214" targcat="WG.fits" targclass="STAR" targdec="-4.355934520437377" targepoch="2015.5" targid="WG_12284_949" targname="" targparal="0.7881032" targpmdec="-3.1337984" targpmra="-3.8588078" targprio="10.0" targprog="LIFU" targra="315.4180431475538" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.00713432" emag_g="" emag_gg="0.002455933" emag_i="" emag_r="" emag_rp="0.008512651" mag_bp="16.536444" mag_g="16.570948" mag_gg="16.056608" mag_i="15.663929" mag_r="15.937352" mag_rp="15.43187"/>
+        </target>
+        <target cname="WVE_21015008-0419248" targcat="WG.fits" targclass="STAR" targdec="-4.323560667037456" targepoch="2015.5" targid="WG_12284_978" targname="" targparal="0.65223086" targpmdec="-1.558538" targpmra="-3.216445" targprio="10.0" targprog="ANY" targra="315.45867360507725" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0016501215" emag_g="" emag_gg="0.0004993597" emag_i="" emag_r="" emag_rp="0.002156227" mag_bp="15.024604" mag_g="15.043312" mag_gg="14.689645" mag_i="14.470089" mag_r="14.673084" mag_rp="14.195989"/>
+        </target>
+        <target cname="WVE_21034920-0355186" targcat="WG.fits" targclass="STAR" targdec="-3.9218219652053405" targepoch="2015.5" targid="WG_12284_1182" targname="" targparal="0.7303847" targpmdec="-8.79646" targpmra="-2.3729796" targprio="10.0" targprog="LIFU" targra="315.955010981824" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0044292402" emag_g="" emag_gg="0.00067472825" emag_i="" emag_r="" emag_rp="0.0029021262" mag_bp="16.43704" mag_g="16.556044" mag_gg="16.008331" mag_i="15.770018" mag_r="15.954795" mag_rp="15.432568"/>
+        </target>
+        <target cname="WVE_21020146-0417283" targcat="WG.fits" targclass="STAR" targdec="-4.291203230798022" targepoch="2015.5" targid="WG_12284_1005" targname="" targparal="1.3410873" targpmdec="-1.0466167" targpmra="4.8869004" targprio="10.0" targprog="LIFU" targra="315.5060704730454" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.007916856" emag_g="" emag_gg="0.001175244" emag_i="" emag_r="" emag_rp="0.008327045" mag_bp="17.457573" mag_g="17.853191" mag_gg="16.726015" mag_i="16.250069" mag_r="16.702057" mag_rp="15.879928"/>
+        </target>
+        <target cname="WVE_21013281-0422375" targcat="WG.fits" targclass="STAR" targdec="-4.377070426423467" targepoch="2015.5" targid="WG_12284_925" targname="" targparal="1.4491259" targpmdec="-3.0158825" targpmra="9.454862" targprio="10.0" targprog="ANY" targra="315.3866922424488" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0047504804" emag_g="" emag_gg="0.00074587716" emag_i="" emag_r="" emag_rp="0.0060336185" mag_bp="16.638739" mag_g="16.992033" mag_gg="15.973291" mag_i="15.544219" mag_r="15.923392" mag_rp="15.178746"/>
+        </target>
+        <target cname="WVE_21042254-0349156" targcat="WG.fits" targclass="STAR" targdec="-3.821009970289901" targepoch="2015.5" targid="WG_12284_1212" targname="" targparal="0.84670484" targpmdec="0.463754" targpmra="-1.9450349" targprio="10.0" targprog="ANY" targra="316.09392280999487" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0022412357" emag_g="" emag_gg="0.00037064785" emag_i="" emag_r="" emag_rp="0.0013078054" mag_bp="14.841661" mag_g="14.913403" mag_gg="14.509163" mag_i="14.326699" mag_r="14.478444" mag_rp="14.013346"/>
+        </target>
+        <target cname="WVE_21025325-0402364" targcat="WG.fits" targclass="STAR" targdec="-4.043430713216199" targepoch="2015.5" targid="WG_12284_1116" targname="" targparal="2.4043715" targpmdec="-2.011539" targpmra="-1.3363134" targprio="10.0" targprog="ANY" targra="315.7218647413014" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.002748584" emag_g="" emag_gg="0.0005279961" emag_i="" emag_r="" emag_rp="0.0021189384" mag_bp="15.698007" mag_g="" mag_gg="14.997873" mag_i="" mag_r="" mag_rp="14.194836"/>
+        </target>
+        <target cname="WVE_21023494-0401189" targcat="WG.fits" targclass="STAR" targdec="-4.0219044352354" targepoch="2015.5" targid="WG_12284_1082" targname="" targparal="1.097283" targpmdec="-0.1704493" targpmra="-4.304982" targprio="10.0" targprog="LIFU" targra="315.645590710243" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.008823531" emag_g="" emag_gg="0.0008153171" emag_i="" emag_r="" emag_rp="0.0024313654" mag_bp="16.68379" mag_g="" mag_gg="16.089046" mag_i="" mag_r="" mag_rp="15.36636"/>
+        </target>
+        <target cname="WVE_21020318-0416186" targcat="WG.fits" targclass="STAR" targdec="-4.2718363699998685" targepoch="2015.5" targid="WG_12284_1015" targname="" targparal="0.66523296" targpmdec="-7.290265" targpmra="-0.33646983" targprio="10.0" targprog="ANY" targra="315.51326259892693" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0024268106" emag_g="" emag_gg="0.0006048604" emag_i="" emag_r="" emag_rp="0.0035546338" mag_bp="15.537772" mag_g="15.659335" mag_gg="15.128803" mag_i="14.901087" mag_r="15.081812" mag_rp="14.566715"/>
+        </target>
+        <target cname="WVE_21032979-0352142" targcat="WG.fits" targclass="STAR" targdec="-3.870622738173758" targepoch="2015.5" targid="WG_12284_1165" targname="" targparal="2.07453" targpmdec="-6.966472" targpmra="3.6484919" targprio="10.0" targprog="LIFU" targra="315.87414094194656" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.048595987" emag_g="" emag_gg="0.0018184887" emag_i="" emag_r="" emag_rp="0.007508082" mag_bp="19.117075" mag_g="19.644411" mag_gg="17.820683" mag_i="17.14846" mag_r="18.192343" mag_rp="16.697132"/>
+        </target>
+        <target cname="WVE_21015401-0414295" targcat="WG.fits" targclass="STAR" targdec="-4.241516620123464" targepoch="2015.5" targid="WG_12284_991" targname="" targparal="1.32115" targpmdec="-4.3074927" targpmra="7.1747985" targprio="10.0" targprog="LIFU" targra="315.4750500836288" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.02507079" emag_g="" emag_gg="0.0016994199" emag_i="" emag_r="" emag_rp="0.0048607956" mag_bp="18.074348" mag_g="18.589989" mag_gg="17.211666" mag_i="16.654053" mag_r="17.236471" mag_rp="16.286211"/>
+        </target>
+        <target cname="WVE_21020554-0409208" targcat="WG.fits" targclass="STAR" targdec="-4.1557744829406165" targepoch="2015.5" targid="WG_12284_1022" targname="" targparal="1.1009893" targpmdec="-3.4310632" targpmra="-2.1883512" targprio="10.0" targprog="LIFU" targra="315.52308549293633" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.016880978" emag_g="" emag_gg="0.0010707672" emag_i="" emag_r="" emag_rp="0.0052714786" mag_bp="17.309467" mag_g="" mag_gg="16.623365" mag_i="" mag_r="" mag_rp="15.824415"/>
+        </target>
+        <target cname="WVE_21022567-0402514" targcat="WG.fits" targclass="STAR" targdec="-4.047599173263413" targepoch="2015.5" targid="WG_12284_1066" targname="" targparal="1.0926957" targpmdec="8.680619" targpmra="4.2103004" targprio="10.0" targprog="LIFU" targra="315.6069418217198" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.012015098" emag_g="" emag_gg="0.000930323" emag_i="" emag_r="" emag_rp="0.0029504322" mag_bp="17.193554" mag_g="17.463991" mag_gg="16.586012" mag_i="16.20303" mag_r="16.52664" mag_rp="15.853395"/>
+        </target>
+        <target cname="WVE_21012067-0428001" targcat="WG.fits" targclass="STAR" targdec="-4.4666913776997665" targepoch="2015.5" targid="WG_12284_904" targname="" targparal="2.6093862" targpmdec="-1.4087187" targpmra="-2.829754" targprio="10.0" targprog="LIFU" targra="315.3361363902284" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.040304314" emag_g="" emag_gg="0.0014171561" emag_i="" emag_r="" emag_rp="0.009547818" mag_bp="19.161234" mag_g="" mag_gg="17.906721" mag_i="" mag_r="" mag_rp="16.79392"/>
+        </target>
+        <target cname="WVE_21030020-0356590" targcat="WG.fits" targclass="STAR" targdec="-3.94972431047007" targepoch="2015.5" targid="WG_12284_1127" targname="" targparal="1.114053" targpmdec="-8.3407135" targpmra="-1.9410151" targprio="10.0" targprog="LIFU" targra="315.750822983916" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0037935928" emag_g="" emag_gg="0.0008192686" emag_i="" emag_r="" emag_rp="0.0043320237" mag_bp="16.83719" mag_g="17.10374" mag_gg="16.235703" mag_i="15.837853" mag_r="16.16167" mag_rp="15.507137"/>
+        </target>
+        <target cname="WVE_21030716-0357052" targcat="WG.fits" targclass="STAR" targdec="-3.9514452670403806" targepoch="2015.5" targid="WG_12284_1139" targname="" targparal="0.7839173" targpmdec="1.1360905" targpmra="-1.0850137" targprio="10.0" targprog="ANY" targra="315.77983829507605" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.00324389" emag_g="" emag_gg="0.00044298847" emag_i="" emag_r="" emag_rp="0.00251385" mag_bp="15.133654" mag_g="15.219717" mag_gg="14.766685" mag_i="14.558331" mag_r="14.718116" mag_rp="14.242264"/>
+        </target>
+        <target cname="WVE_21033647-0355001" targcat="WG.fits" targclass="STAR" targdec="-3.9166818909225194" targepoch="2015.5" targid="WG_12284_1171" targname="" targparal="0.5135971" targpmdec="-5.012894" targpmra="-6.367044" targprio="10.0" targprog="ANY" targra="315.90195784526554" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0060286596" emag_g="" emag_gg="0.000650987" emag_i="" emag_r="" emag_rp="0.003076549" mag_bp="16.202112" mag_g="16.283195" mag_gg="15.864343" mag_i="15.695691" mag_r="15.840325" mag_rp="15.359649"/>
+        </target>
+        <target cname="WVE_21034071-0352318" targcat="WG.fits" targclass="STAR" targdec="-3.8755126456882607" targepoch="2015.5" targid="WG_12284_1175" targname="" targparal="1.5985829" targpmdec="-4.634585" targpmra="-1.1631565" targprio="10.0" targprog="LIFU" targra="315.9196292959456" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.012438417" emag_g="" emag_gg="0.0011623878" emag_i="" emag_r="" emag_rp="0.005578554" mag_bp="18.23207" mag_g="18.768545" mag_gg="17.176773" mag_i="16.564648" mag_r="17.31598" mag_rp="16.178667"/>
+        </target>
+        <target cname="WVE_21013420-0425566" targcat="WG.fits" targclass="STAR" targdec="-4.432387289165628" targepoch="2015.5" targid="WG_12284_929" targname="" targparal="1.2837188" targpmdec="-5.3409142" targpmra="6.5621676" targprio="10.0" targprog="ANY" targra="315.39250712599386" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0075748055" emag_g="" emag_gg="0.0004508593" emag_i="" emag_r="" emag_rp="0.0019058805" mag_bp="15.725846" mag_g="15.932695" mag_gg="15.208664" mag_i="14.889708" mag_r="15.143142" mag_rp="14.552008"/>
+        </target>
+        <target cname="WVE_21023265-0403268" targcat="WG.fits" targclass="STAR" targdec="-4.057435310958707" targepoch="2015.5" targid="WG_12284_1078" targname="" targparal="2.1487687" targpmdec="-3.3677661" targpmra="8.16503" targprio="10.0" targprog="LIFU" targra="315.63604869929503" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.028989147" emag_g="" emag_gg="0.0017533796" emag_i="" emag_r="" emag_rp="0.0065158526" mag_bp="18.44918" mag_g="" mag_gg="17.363678" mag_i="" mag_r="" mag_rp="16.27971"/>
+        </target>
+        <target cname="WVE_21033328-0357570" targcat="WG.fits" targclass="STAR" targdec="-3.9658254936148567" targepoch="2015.5" targid="WG_12284_1169" targname="" targparal="0.9462608" targpmdec="-6.813667" targpmra="-4.531405" targprio="10.0" targprog="ANY" targra="315.8886759875185" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.0017497551" emag_g="" emag_gg="0.00038056917" emag_i="" emag_r="" emag_rp="0.0015533058" mag_bp="15.411918" mag_g="15.52782" mag_gg="14.989401" mag_i="14.752525" mag_r="14.927893" mag_rp="14.421068"/>
+        </target>
+        <target cname="WVE_21020231-0410377" targcat="WG.fits" targclass="STAR" targdec="-4.177148912307005" targepoch="2015.5" targid="WG_12284_1008" targname="" targparal="0.832098" targpmdec="-2.8196318" targpmra="-4.71405" targprio="10.0" targprog="ANY" targra="315.5096450399486" targsrvy="WG" targuse="G">
+          <photometry emag_bp="0.011746771" emag_g="" emag_gg="0.00069670746" emag_i="" emag_r="" emag_rp="0.0022382871" mag_bp="15.399664" mag_g="" mag_gg="15.036631" mag_i="" mag_r="" mag_rp="14.494694"/>
+        </target>
+        <target cname="%%%" targcat="WD.fits" targclass="STAR_WD" targdec="-5.125447208648595" targepoch="2016.0" targid="WDJ210531.88-050731.24" targname="WDJ210531.88-050731.24" targparal="9.779278" targpmdec="-23.522184" targpmra="-52.7277" targprio="7.0" targprog="LR" targra="316.3825893781909" targsrvy="WD" targuse="C">
+          <photometry emag_bp="0.048295" emag_g="0.0143" emag_gg="0.004097" emag_i="0.0046" emag_r="0.0079" emag_rp="0.03799" mag_bp="19.65835" mag_g="19.7242" mag_gg="19.293377" mag_i="19.1073" mag_r="19.2708" mag_rp="18.808584"/>
+        </target>
+        <target cname="%%%" targcat="WD.fits" targclass="STAR_WD" targdec="-4.582960907127339" targepoch="2016.0" targid="WDJ210627.72-043458.74" targname="WDJ210627.72-043458.74" targparal="1.3145013" targpmdec="4.907951" targpmra="9.754557" targprio="7.0" targprog="LR" targra="316.6155686228177" targsrvy="WD" targuse="C">
+          <photometry emag_bp="0.023128" emag_g="0.0074" emag_gg="0.003698" emag_i="0.0095" emag_r="0.0075" emag_rp="0.048733" mag_bp="18.757061" mag_g="18.6851" mag_gg="18.812578" mag_i="19.3161" mag_r="19.0156" mag_rp="19.104528"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.35250" targepoch="2015.5" targid="PGC_91697" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.95580" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.11310" targepoch="2015.5" targid="PGC_65950" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="315.56080" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.92780" targepoch="2015.5" targid="PGC_1051614" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="315.90790" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.14750" targepoch="2015.5" targid="PGC_1048686" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="315.85750" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.40140" targepoch="2015.5" targid="PGC_1058689" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="315.67000" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.46440" targepoch="2015.5" targid="PGC_1044404" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.63960" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.40000" targepoch="2015.5" targid="PGC_1045221" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.28580" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.68780" targepoch="2015.5" targid="PGC_1054814" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.76460" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.67220" targepoch="2015.5" targid="PGC_1041786" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.39580" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.19330" targepoch="2015.5" targid="PGC_1048019" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.70500" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-3.88080" targepoch="2015.5" targid="PGC_1065694" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.54830" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.91860" targepoch="2015.5" targid="PGC_1051735" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.71250" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.76640" targepoch="2015.5" targid="PGC_1053791" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.48960" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.30890" targepoch="2015.5" targid="PGC_1060024" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.13620" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.31500" targepoch="2015.5" targid="PGC_1059931" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.92290" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.08970" targepoch="2015.5" targid="PGC_1063030" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="315.69460" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.77970" targepoch="2015.5" targid="PGC_1053595" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.91790" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.62470" targepoch="2015.5" targid="PGC_1055624" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.06120" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-5.07610" targepoch="2015.5" targid="PGC_1049654" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.73540" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.26470" targepoch="2015.5" targid="PGC_1060631" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.23670" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.44970" targepoch="2015.5" targid="PGC_1058049" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.59670" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+        <target cname="%%%" targcat="WC_2020A1.fits" targclass="UNKNOWN" targdec="-4.57890" targepoch="2015.5" targid="PGC_1056295" targname="CLUSTER1" targparal="0.0" targpmdec="0.0" targpmra="0.0" targprio="1.0" targprog="LR" targra="316.98250" targsrvy="WC" targuse="T">
+          <photometry emag_bp="%%%" emag_g="%%%" emag_gg="%%%" emag_i="%%%" emag_r="%%%" emag_rp="%%%" mag_bp="%%%" mag_g="%%%" mag_gg="%%%" mag_i="%%%" mag_r="%%%" mag_rp="%%%"/>
+        </target>
+      </field>
+    </fields>
+  </observation>
+</weave>

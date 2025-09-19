@@ -1,0 +1,1 @@
+../stage3/add_guide_and_calib_stars.py

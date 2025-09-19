@@ -1,0 +1,80 @@
+KEY, LINKING_MODE, GROUP_ID, SEED_VALUE
+#
+# This is an example file demonstrating how the linking csv file should be structured.
+#
+# Column description:
+# 
+# - KEY:            Identifier column using the following structure:
+#                   progtemp:obs_temp:TARGNAME:TARGID:IFU_DITHER 
+#                   Colons must be separate the components or this process will fail
+# - LINKING_MODE:   Defines the type of OB linking, permitting either:
+#                   L - (L)inked groups
+#                   O - (O)bs groups
+# - GROUP_ID:       User-defined name of the group. Be aware WASP may impose restrictions,
+#                   including a 20-character string size limit         
+# - SEED_VALUE:     Contextual initial value for the group, depending on LINKING_MODE:
+#                   (L)inked groups - this is the linkgroup_priority
+#                   (O)bs groups - this is the obsgroup_validity
+#
+# The following are a series of example OB linking definitions. Where useful, we include
+# information describing the usage for each case.
+#
+#
+# Create a linking group so that the 3 and -3 LIFU dithers are grouped
+41331:IAEEB:PSZ1_125A:PSZ1_125A:3, L, PSZ1125A_3m3dthergrp, 8
+41331:IAEEB:PSZ1_125A:PSZ1_125A:-3, L, PSZ1125A_3m3dthergrp, 8
+#
+# Add in the 6-dither HR observation of the same target to an (implied) existing group
+# 53331:IAEEB:PSZ1_125A:PSZ1_130A:6, L, PSZ1125A_6dthergrpHR, 4
+53331:IAEEB:PSZ1_125A:PSZ1_130A:6, L, PSZ1125A_6dthergrpHR, 4
+#
+# If PGC_91697 is observed in a mIFU bundle, then the other dither pattern for it should
+# be observed within a week.
+71331:IAEEB:CLUSTER1:PGC_91697:3, O, c1_7daysgrp, 7
+71661:IAEEB:CLUSTER1:PGC_91697:6, O, c1_7daysgrp, 7    
+#
+# Be careful with typos - intent below is to also add PGC_1060024 to this group. The workflow
+# should report that this key was not used in linking. But why? ("CLUSTER" vs "CLUSTER1")
+71331:IAEEB:CLUSTER:PGC_1060024:3, O, c1_weekgrp, 7
+#
+# Based on the input target list, the following should not be grouped
+71331:IAEEB:CLUSTER1:PGC_1049654:3, L, nogroup, 1
+#
+# Ability to set the same input target with both (L)inked groups and (O)bs groups
+71331:IAEEB:CLUSTER1:PGC_91697:3, L, c1_linkgrp, 3 
+#
+# Diagnostic tests (uncomment for deeper testing)
+#
+# Further examples of groups that will not be linked to XML files
+# 71441.4:GBCEB:WDJ160039.64+263005.82:WDJ160039.64+263005.82:4, L, 3, 7
+# 41332:NBDEB:Abell 2142:A2142center:5, L, 1, 5
+#
+# Test that both L and O linking can be used for a LIFU case:
+# 41331:IAEEB:PSZ1_125A:PSZ1_125A:3, O, test_obsgroup, 7
+#
+# Confirmation when not using strict mode, will prefer c1_3daysgrp (better SEED_VALUE)
+# This selects additional targets in the mIFU bundle, but sets them to a different group
+# 71331:IAEEB:CLUSTER1:PGC_1041786:3, O, c1_3daysgrp, 3
+#
+# Confirmation when not using strict mode, will prefer c1_linkgrp2 (better SEED_VALUE)
+# This selects additional targets in the mIFU bundle, but sets them to a different group
+# 71331:IAEEB:CLUSTER1:PGC_1041786:3, L, c1_linkgrp2, 8
+#
+# Confirmation when not using strict mode, will prefer c1_7daysgrp (more linked bundles found)
+# This selects additional targets in the mIFU bundle, but sets them to a different group
+# 71331:IAEEB:CLUSTER1:PGC_1041786:3, O, c1_3daysgrp, 3
+# 71331:IAEEB:CLUSTER1:PGC_1060024:3, O, c1_7daysgrp, 7
+#
+# 81331:IAEEB:CLUSTER1HR:PGC_1051614:3, L, MIFU_TEST, 1
+# 81331:IAEEB:CLUSTER1HR:PGC_1051614:3, L, NEW_MIFU_TEST, 10
+#
+# Check that the mIFU XMLs are linking to the correct keys (depends on user bundle assignment!) 
+# 81331:IAEEB:CLUSTER1HR:PGC_1058689:3, O, overwrite, 2 --> mifu02
+# 71331:IAEEB:CLUSTER1:PGC_1051614:3, L, MIFU_TEST, 19 --> mifu01
+#
+# Testing rejection of duplicate keys (irrespective of strict mode)
+# 41331:IAEEB:PSZ1_125A:PSZ1_125A:3, L, dupekey_group, 2 
+
+
+
+ 

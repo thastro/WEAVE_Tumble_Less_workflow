@@ -13,3 +13,4 @@ BlankXMLTemplate.xml
 obstemp.dat
 progtemp.dat
 src/__pycache__/
+resources/*.parquet

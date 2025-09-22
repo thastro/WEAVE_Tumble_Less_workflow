@@ -903,7 +903,6 @@ class OBXML:
 
         if len(calibs_table) == 0:
             logging.info('There are no calib stars available')
-            
 
         self._add_table_as_targets(calibs_table, assert_targuse='C',
                                    add_cnames=add_cnames, cache=cache)

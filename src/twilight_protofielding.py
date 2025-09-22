@@ -1106,9 +1106,11 @@ class TLDriverCat:
         tarprog_mask = np.array([targprog in targprogs
                                  for targprog in self.data['TARGPROG']])
         # print(targprogs)
-        # print(self.data[['TARGPROG', 'TARGID']])
+        # print(self.data[['TARGPROG', 'TARGID', 'TARGUSE']])
+        # print(self.data[self.data['TARGUSE'] == 'T'])
+
         batch_data = self.data[tarprog_mask]
-        # print(batch_data)
+        # print(batch_data[['GAIA_RA', 'TARGUSE']])
         field_ids = field_batch['fieldId'].tolist()
 
         batch_xml = TLOBXML(self.xml_template)
@@ -1117,6 +1119,7 @@ class TLDriverCat:
         self._def_max_guide = int(batch_xml.configure.getAttribute('max_guide'))
         self._def_max_sky = int(batch_xml.configure.getAttribute('max_sky'))
         self._def_pa = batch_xml.observation.getAttribute('pa')
+
         # Remove the elements and attributes which are configure outputs
         batch_xml.remove_configure_outputs()
 

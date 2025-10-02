@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import os
 from astropy.io import fits
 import healpy as hp
@@ -9,6 +8,7 @@ from workflow.utils.get_resources import get_guide_cat
 
 def query_weave_guide_stars(healpix_ids,
                             out_dir='./resources/WG',
+                            base_name='WG_',
                             split_nr=5,
                             mag_low=14.5,
                             mag_high=16,
@@ -24,16 +24,18 @@ def query_weave_guide_stars(healpix_ids,
     Args:
         healpix_ids (list): List of HEALPix IDs to query the guide stars for.
         out_dir (str): Directory where the output parquet files will be saved.
+        base_name (str): Base name for the output parquet files.
         split_nr (int, optional): Desired nr. of fits files to be combined in the same
                                   parquet file. Defaults to 5.
-        mag_low (float): Minimum magnitude of the guide stars to be included.
-                                   Defaults to 14.5.
-        mag_high (float): Maximum magnitude of the guide stars to be included.
-                                  Defaults to 16.
-        cache (bool): If True, the original fits files will not be removed after
-                                reading. Defaults to False.
+        mag_low (float): Minimum magnitude (Gaia G-band) of the guide stars to be included.
+                         Defaults to 14.5.
+        mag_high (float): Maximum magnitude (Gaia G-band) of the guide stars to be included.
+                          Defaults to 16.
+        cache (bool): If True, the downloaded fits files will not be removed after
+                      reading. Defaults to False.
         neighbour_hp (bool): If True, the function will also query the neighbouring
-                             HEALPix indices for guide stars. Defaults to True.
+                             HEALPix indices for guide stars. This allows for better
+                             guide fibre allocatcion later .Defaults to True.
     """
 
     nside = 32
@@ -55,7 +57,8 @@ def query_weave_guide_stars(healpix_ids,
         try:
             file_path = get_guide_cat(healpix_index=healpix_id, directory=out_dir)
         except SystemExit:
-            print(f"SystemExit triggered (likely HTTP 404) for HEALPix ID {healpix_id}, skipping.")
+            print(f"SystemExit triggered (likely HTTP 404) for HEALPix ID {healpix_id}, "
+                  "skipping.")
             continue
         except Exception as e:
             print(f"Unexpected error retrieving guide stars for HEALPix ID {healpix_id}: {e}")
@@ -80,7 +83,7 @@ def query_weave_guide_stars(healpix_ids,
 
         if split_nr is not None and len(dfs) == split_nr:
             combined = pd.concat(dfs, ignore_index=True)
-            parquet_name = 'WG_all.parquet' if split_nr is None else 'WG_' + '_'.join(hpids) + '.parquet'
+            parquet_name = f'{base_name}_all.parquet' if split_nr is None else f'{base_name}_' + '_'.join(hpids) + '.parquet'
             parquet_path = os.path.join(out_dir, parquet_name)
             combined.to_parquet(parquet_path, index=False)
             dfs.clear()
@@ -89,28 +92,9 @@ def query_weave_guide_stars(healpix_ids,
 
     if dfs:
         combined = pd.concat(dfs, ignore_index=True)
-        parquet_name = 'WG_all.parquet' if split_nr is None else 'WG_' + '_'.join(hpids) + '.parquet'
+        parquet_name = f'{base_name}_all.parquet' if split_nr is None else f'{base_name}_' + '_'.join(hpids) + '.parquet'
         parquet_path = os.path.join(out_dir, parquet_name)
         combined.to_parquet(parquet_path, index=False)
-
-
-def decode_byte_columns(df: pd.DataFrame, to_string_dtype: bool = True) -> pd.DataFrame:
-    obj_cols = [c for c in df.columns if df[c].dtype == 'object']
-    for c in obj_cols:
-        s = df[c]
-        if s.map(lambda v: isinstance(v, (bytes, np.bytes_))).any():
-            df[c] = s.map(
-                lambda v: (
-                    "" if isinstance(v, (bytes, np.bytes_)) and len(v) == 0
-                    else (v.decode("utf-8", "ignore") if isinstance(v, (bytes, np.bytes_)) else v)
-                )
-            )
-    if to_string_dtype:
-        # only cast columns that are all strings after decode
-        for c in obj_cols:
-            if df[c].map(lambda v: (v is None) or isinstance(v, str)).all():
-                df[c] = df[c].astype("string")
-    return df
 
 
 def combine_wg_with_input_cat(input_df, wg_df, src_id_col='CNAME'):
@@ -125,7 +109,7 @@ def combine_wg_with_input_cat(input_df, wg_df, src_id_col='CNAME'):
         input_df (pd.DataFrame): The input DataFrame to which new rows will be added.
         wg_df (pd.DataFrame): The WEAVE guide star DataFrame containing guide stars from
                               previously queried helapix regions.
-        id_col (str, optional): The column name used to identify unique entries.
+        id_col (str, optional): The name of the column containing the unique target identifier.
                                 Defaults to 'CNAME'.
 
     Returns:
@@ -133,6 +117,7 @@ def combine_wg_with_input_cat(input_df, wg_df, src_id_col='CNAME'):
                       from the WEAVE guide star DataFrame, ensuring uniqueness based on
                       the specified ID column.
     """
+
     input_df = input_df.copy()
     input_df.loc[:, 'sourceFlag'] = 0
 
@@ -151,5 +136,25 @@ def combine_wg_with_input_cat(input_df, wg_df, src_id_col='CNAME'):
 
 
 if __name__ == "__main__":
-    # Do Nothing
-    pass
+
+    # Example Usage
+    # Load an example input catalogue as a pandas DataFrame.
+    with fits.open("./WS2025XX-XXX.fits") as hdu:
+        cat_df = Table(hdu[1].data).to_pandas()
+
+    healpix_ids = [2881, 2880, 2539]
+
+    # Query guide stars. In real use case neighbour_hp should be set to True,
+    # here set to False to limit the number of queried stars.
+
+    query_weave_guide_stars(healpix_ids, split_nr=None,
+                            out_dir='./resources/WG',
+                            base_name='WG_',
+                            mag_low=14.5,
+                            mag_high=15,
+                            cache=False,
+                            neighbour_hp=False)
+
+    wg_df = pd.read_parquet('./resources/WG/WG_all.parquet')
+    cat_comb_df = combine_wg_with_input_cat(cat_df, wg_df, src_id_col='CNAME')
+    print(cat_comb_df)

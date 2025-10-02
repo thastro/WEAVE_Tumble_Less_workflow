@@ -14,3 +14,9 @@ obstemp.dat
 progtemp.dat
 src/__pycache__/
 resources/*.parquet
+resources/*.csv
+resources/*.fits
+Kepler_field.ipynb
+gaia_crossmatch_beck.ipynb
+Untitled.ipynb
+*.xml

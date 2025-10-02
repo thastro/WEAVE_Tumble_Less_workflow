@@ -414,7 +414,7 @@ def plot_wtl_field(wtl_df, wtl_df2=None, coords='galactic', weave_fov=False,
 
 
 def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
-                         outpath=None, figsize=(8, 8)):
+                         outpath=None, figsize=(8, 8), alpha=1):
     plot_df = field_stars_df.copy()
     plot_stars = plot_df[plot_df['sourceFlag'].isin([0, 9])]
 
@@ -432,17 +432,18 @@ def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
     for bid in plot_df['batchId'].unique():
         plot_ss = plot_stars[(plot_stars['batchId'] == bid)]
         if not plot_ss.empty:
-            wcs_plot(plot_ss, ra_col=coord_x, de_col=coord_y,
+            wcs_plot(plot_ss[~plot_ss['sourceFlag'].isin([-1, 9])],
+                     ra_col=coord_x, de_col=coord_y,
                      kepler_fov=False, alpha=0.5, fill=True, zorder=0,
                      color='crimson', marker='*', markersize=10, ax=ax,
                      label='Science targets')
             wcs_plot(plot_ss[plot_ss['sourceFlag'].isin([9])], ra_col=coord_x, de_col=coord_y,
-                     kepler_fov=False, alpha=1, fill=True, zorder=0,
+                     kepler_fov=False, alpha=alpha, fill=True, zorder=0,
                      color='k', marker='D', markersize=30, ax=ax,
                      label='Central guide star')
 
     # Plot WEAVE FOV
-    plot_WTL_wcs_circles(plot_df, ra_col=coord_x, de_col=coord_y, alpha=0.8)
+    plot_WTL_wcs_circles(plot_df, ra_col=coord_x, de_col=coord_y, alpha=alpha)
 
     # Remove duplicated legend items
     handles, labels = ax.get_legend_handles_labels()

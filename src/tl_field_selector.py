@@ -930,7 +930,8 @@ def get_science_covering_guide_star_circles_fixed(
     """
     Returns guide-star-centered circle coordinates (RA, Dec) that cover science targets.
     If `circles_df` is provided, snaps those circle centres to the nearest guide stars.
-    Otherwise generates an evenly spaced grid inside the science bounding box and snaps to guides.
+    Otherwise generates an evenly spaced grid inside the science bounding box and
+    snaps to guides.
 
     Parameters
     ----------
@@ -1132,7 +1133,7 @@ def get_science_covering_guide_star_circles(
         logging.warning("No grid points inside buffered science footprint.")
         return [], pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
 
-    # --- Helpers ---
+    # Helper funtions
     def coverage_vector_for_center_xy(center_xy):
         dx = sci_xy[:, 0] - center_xy[0]
         dy = sci_xy[:, 1] - center_xy[1]
@@ -1145,7 +1146,8 @@ def get_science_covering_guide_star_circles(
         dy = sci_xy[:, 1][:, None] - cen_xy[:, 1][None, :]
         return (dx*dx + dy*dy) <= (circle_radius**2)
 
-    # --- Smart snapping: for each grid node, choose guide within match_radius that covers MOST science ---
+    # Snapping: for each grid node, choose guide within match_radius
+    # that covers MOST science
     # Dist from grid -> guides
     xg = grid_xy[:, 0][:, None]            # (Ng,1)
     yg = grid_xy[:, 1][:, None]
@@ -1197,7 +1199,7 @@ def get_science_covering_guide_star_circles(
             'Dec': sci_coords.dec.deg[uncoverable_mask],
         })
     else:
-        uncv = pd.DataFrame(columns=['CNAME','GAIA_ID','RA','Dec'])
+        uncv = pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
 
     # Augment: if snapped candidates don't cover all coverable science, add all nearby guides
     cov = coverage_matrix_for_coords(cand_coords) if cand_idxs.size else np.zeros((sci_xy.shape[0], 0), bool)
@@ -1342,20 +1344,603 @@ def get_science_covering_guide_star_circles(
     return centers
 
 
+def get_science_covering_guide_star_circles_n(
+    df,
+    ra_col='GAIA_RA',
+    dec_col='GAIA_DEC',
+    flag_col='sourceFlag',
+    cname_col='CNAME',
+    gaia_id_col='GAIA_ID',
+    mag_col='GAIA_MAG_G',
+    central_star_mag_lim=16.0,  # max mag for central guide star
+    spacing=1.5,               # grid spacing (deg) in tangent plane
+    circle_radius=1.0,         # circle radius (deg)
+    match_radius=1.0,          # grid node / provided center can snap to any guide within this (deg)
+    move_radius=None,          # how far a chosen center may "nudge" to another guide (deg)
+    min_science_per_circle=1,  # drop very weak circles
+    random_state=42,
+    # --- NEW ---
+    optimal_centers_df=None,   # optional DataFrame with RA/Dec of optimized centers
+    opt_ra_col='GAIA_RA',
+    opt_dec_col='GAIA_DEC',
+):
+    """
+    Science-footprint grid -> smart snap to guides -> augment for full cover ->
+    greedy set cover -> redundancy prune -> local refinement (swap to nearby guides)
+    to remove unnecessary circles. Non-failing: warns & returns uncoverable targets.
+
+    If `optimal_centers_df` is provided, skip footprint/grid; snap those centers to
+    nearest eligible guides within match_radius and run the greedy optimization
+    *only on those snapped candidates*.
+
+    Returns
+    -------
+    centers : List[(float,float)]
+        Selected (RA_deg, Dec_deg) of guide-centred circles after refinement.
+    uncovered_df : pd.DataFrame
+        Uncoverable science targets (no guide within circle_radius) with CNAME/GAIA_ID/RA/Dec.
+    """
+    import logging
+    import numpy as np
+    import pandas as pd
+    from astropy import units as u
+    from astropy.coordinates import SkyCoord, SkyOffsetFrame
+
+    rng = np.random.default_rng(random_state)
+    if move_radius is None:
+        move_radius = match_radius
+
+    guides = df[df[flag_col] == 9].copy()
+    science = df[df[flag_col] != 9].copy()
+
+    guides = guides[guides[mag_col] <= central_star_mag_lim]
+
+    if guides.empty or science.empty:
+        return [], pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
+
+    # --- Tangent plane around science median (kept the same in both modes) ---
+    sci_coords = SkyCoord(science[ra_col].to_numpy() * u.deg,
+                          science[dec_col].to_numpy() * u.deg)
+    origin = SkyCoord(np.median(sci_coords.ra.deg) * u.deg,
+                      np.median(sci_coords.dec.deg) * u.deg)
+    off = SkyOffsetFrame(origin=origin)
+    sci_off = sci_coords.transform_to(off)
+    sci_xy = np.column_stack([sci_off.lon.deg, sci_off.lat.deg])  # (Nsci,2)
+
+    gs_coords = SkyCoord(guides[ra_col].to_numpy() * u.deg,
+                         guides[dec_col].to_numpy() * u.deg)
+    gs_off = gs_coords.transform_to(off)
+    gs_xy = np.column_stack([gs_off.lon.deg, gs_off.lat.deg])     # (Ngs,2)
+
+    # Helper functions (unchanged)
+    def coverage_vector_for_center_xy(center_xy):
+        dx = sci_xy[:, 0] - center_xy[0]
+        dy = sci_xy[:, 1] - center_xy[1]
+        return (dx*dx + dy*dy) <= (circle_radius**2)
+
+    def coverage_matrix_for_coords(centers_coords):
+        cen_off = centers_coords.transform_to(off)
+        cen_xy = np.column_stack([cen_off.lon.deg, cen_off.lat.deg])
+        dx = sci_xy[:, 0][:, None] - cen_xy[:, 0][None, :]
+        dy = sci_xy[:, 1][:, None] - cen_xy[:, 1][None, :]
+        return (dx*dx + dy*dy) <= (circle_radius**2)
+
+    # =========================
+    # BRANCH A: optimal centers provided -> snap & go (no hull/grid/augment)
+    # =========================
+    if optimal_centers_df is not None and len(optimal_centers_df) > 0:
+        # Build SkyCoord for provided centers
+        opt_centers = SkyCoord(
+            optimal_centers_df[opt_ra_col].to_numpy() * u.deg,
+            optimal_centers_df[opt_dec_col].to_numpy() * u.deg
+        )
+
+        # Snap each to nearest eligible guide within match_radius (great-circle)
+        snapped_gidx = []
+        if len(gs_coords) == 0:
+            return [], pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
+
+        # Precompute separations efficiently
+        # For each provided center, choose nearest guide within match_radius
+        for c in opt_centers:
+            sep = c.separation(gs_coords).deg
+            nearest = np.argmin(sep)
+            if sep[nearest] <= match_radius:
+                snapped_gidx.append(nearest)
+            else:
+                # No guide within snapping radius -> skip this provided center
+                continue
+
+        if len(snapped_gidx) == 0:
+            logging.warning("No provided optimal centers could be snapped to a guide within match_radius.")
+            return [], pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
+
+        cand_idxs = np.unique(np.asarray(snapped_gidx, dtype=int))
+        cand_coords = gs_coords[cand_idxs]
+
+        # --- Feasibility: which science are coverable at all? (any guide within circle_radius) ---
+        dx_all = sci_xy[:, 0][:, None] - gs_xy[:, 0][None, :]
+        dy_all = sci_xy[:, 1][:, None] - gs_xy[:, 1][None, :]
+        d2_all = dx_all*dx_all + dy_all*dy_all
+        coverable_mask = (d2_all <= (circle_radius**2)).any(axis=1)
+        uncoverable_mask = ~coverable_mask
+
+        if np.any(uncoverable_mask):
+            cn = science[cname_col] if cname_col in science.columns else pd.Series(['<NA>']*np.sum(uncoverable_mask))
+            gid = science[gaia_id_col] if gaia_id_col in science.columns else pd.Series(['<NA>']*np.sum(uncoverable_mask))
+            uncv = pd.DataFrame({
+                'CNAME': np.asarray(cn)[uncoverable_mask],
+                'GAIA_ID': np.asarray(gid)[uncoverable_mask],
+                'RA': sci_coords.ra.deg[uncoverable_mask],
+                'Dec': sci_coords.dec.deg[uncoverable_mask],
+            })
+        else:
+            uncv = pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
+
+        # Coverage matrix using ONLY the snapped candidates (no augmentation in this branch)
+        cov = coverage_matrix_for_coords(cand_coords)
+        # Filter weak circles
+        keep_c = cov.sum(axis=0) >= max(1, min_science_per_circle)
+        if not np.any(keep_c):
+            # Preserve original behavior (sometimes returned []); here we keep two-value return
+            return [], uncv
+        cand_idxs = cand_idxs[keep_c]
+        cand_coords = cand_coords[keep_c]
+        cov = cov[:, keep_c]
+
+        # --- Set cover over coverable subset ---
+        cov_eff = cov[coverable_mask, :]  # (Neff, Ncand)
+        if cov_eff.shape[0] == 0:
+            return [], uncv
+
+        uncovered = np.ones(cov_eff.shape[0], dtype=bool)
+        order = np.arange(cov_eff.shape[1])
+        rng.shuffle(order)
+
+        chosen_rel = []
+        while uncovered.any():
+            gains = (cov_eff[uncovered, :]).sum(axis=0)
+            j = order[np.argmax(gains[order])]
+            if gains[j] == 0:
+                break
+            chosen_rel.append(j)
+            newly = cov_eff[:, j] & uncovered
+            uncovered[newly] = False
+
+        # Redundancy prune (unchanged)
+        chosen_rel = list(chosen_rel)
+
+        def prune(choices):
+            changed = True
+            while changed:
+                changed = False
+                for k in list(choices):
+                    trial = [t for t in choices if t != k]
+                    if len(trial) == 0:
+                        continue
+                    if cov_eff[:, trial].any(axis=1).all():
+                        choices.remove(k)
+                        changed = True
+            return choices
+
+        chosen_rel = prune(chosen_rel)
+        chosen = np.array(chosen_rel, dtype=int)
+
+        # Local refinement allowed (swap within move_radius) using global guide pool
+        if len(chosen) > 1:
+            chosen_xy = np.column_stack([
+                gs_coords[cand_idxs[chosen]].transform_to(off).lon.deg,
+                gs_coords[cand_idxs[chosen]].transform_to(off).lat.deg
+            ])
+            improved = True
+            while improved and len(chosen) > 1:
+                improved = False
+                cov_ch = cov_eff[:, chosen]
+                for col_idx in range(len(chosen)):
+                    cx, cy = chosen_xy[col_idx]
+                    d2_to_all_guides = (gs_xy[:, 0] - cx)**2 + (gs_xy[:, 1] - cy)**2
+                    alt_idxs = np.where(d2_to_all_guides <= (move_radius**2))[0]
+                    if alt_idxs.size == 0:
+                        continue
+                    for g_alt in alt_idxs:
+                        alt_vec_full = ((sci_xy[:, 0] - gs_xy[g_alt, 0])**2 +
+                                        (sci_xy[:, 1] - gs_xy[g_alt, 1])**2) <= (circle_radius**2)
+                        alt_vec = alt_vec_full[coverable_mask]
+                        trial_cols = cov_eff[:, chosen].copy()
+                        trial_cols[:, col_idx] = alt_vec
+                        if not trial_cols.any(axis=1).all():
+                            continue
+                        active = list(range(trial_cols.shape[1]))
+                        changed = True
+                        while changed:
+                            changed = False
+                            for k in list(active):
+                                trial = [t for t in active if t != k]
+                                if len(trial) == 0:
+                                    continue
+                                if trial_cols[:, trial].any(axis=1).all():
+                                    active.remove(k)
+                                    changed = True
+                        if len(active) < len(chosen):
+                            # Map g_alt to absolute column; if not in cand_idxs, append new
+                            if g_alt not in cand_idxs:
+                                cand_idxs = np.append(cand_idxs, g_alt)
+                                new_col = alt_vec[:, None]
+                                cov_eff = np.hstack([cov_eff, new_col])
+                                chosen[col_idx] = cov_eff.shape[1] - 1
+                            else:
+                                abs_idx = np.where(cand_idxs == g_alt)[0][0]
+                                chosen[col_idx] = abs_idx
+                            chosen = chosen[active]
+                            chosen_xy = np.column_stack([
+                                gs_coords[cand_idxs[chosen]].transform_to(off).lon.deg,
+                                gs_coords[cand_idxs[chosen]].transform_to(off).lat.deg
+                            ])
+                            improved = True
+                            break
+                    if improved:
+                        break
+
+        final_coords = gs_coords[cand_idxs[chosen]] if len(chosen) else SkyCoord([], [], unit='deg')
+        centers = list(zip(final_coords.ra.deg, final_coords.dec.deg))
+        return centers
+
+    # =========================
+    # BRANCH B: ORIGINAL behavior (no optimal centers provided)
+    # =========================
+    # Science footprint bounds (convex-hull + buffer; bbox fallback)
+    use_poly = False
+    try:
+        from scipy.spatial import ConvexHull
+        hull = ConvexHull(sci_xy)
+        hull_pts = sci_xy[hull.vertices]
+        try:
+            from shapely.geometry import Polygon, Point
+            poly = Polygon(hull_pts).buffer(circle_radius)
+            minx, miny, maxx, maxy = poly.bounds
+            use_poly = True
+        except Exception:
+            use_poly = False
+    except Exception:
+        use_poly = False
+
+    if not use_poly:
+        xmin, ymin = sci_xy.min(axis=0) - circle_radius
+        xmax, ymax = sci_xy.max(axis=0) + circle_radius
+        minx, miny, maxx, maxy = xmin, ymin, xmax, ymax
+
+    # --- Grid inside buffered footprint ---
+    xs = np.arange(minx, maxx + spacing*0.5, spacing)
+    ys = np.arange(miny, maxy + spacing*0.5, spacing)
+    gx, gy = np.meshgrid(xs, ys)
+    grid_xy = np.column_stack([gx.ravel(), gy.ravel()])
+
+    if use_poly:
+        from shapely.geometry import Point
+        inside = np.array([poly.contains(Point(x, y)) for x, y in grid_xy])
+        grid_xy = grid_xy[inside]
+
+    if grid_xy.size == 0:
+        logging.warning("No grid points inside buffered science footprint.")
+        return [], pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
+
+    # Dist from grid -> guides and snapping heuristic (as before)
+    xg = grid_xy[:, 0][:, None]            # (Ng,1)
+    yg = grid_xy[:, 1][:, None]
+    xs_g = gs_xy[:, 0][None, :]            # (1,Ngs)
+    ys_g = gs_xy[:, 1][None, :]
+
+    d2_g = (xg - xs_g)**2 + (yg - ys_g)**2
+    within = d2_g <= (match_radius**2)
+
+    cand_idxs = []
+    for i in range(grid_xy.shape[0]):
+        gids = np.where(within[i])[0]
+        if gids.size == 0:
+            continue
+        best_g = None
+        best_score = -1
+        for gidx in gids:
+            vec = coverage_vector_for_center_xy(gs_xy[gidx])
+            score = int(vec.sum())
+            if score > best_score:
+                best_score = score
+                best_g = gidx
+        cand_idxs.append(best_g)
+
+    if len(cand_idxs) == 0:
+        cand_idxs = np.array([], dtype=int)
+    else:
+        cand_idxs = np.unique(np.array(cand_idxs, dtype=int))
+
+    cand_coords = gs_coords[cand_idxs] if cand_idxs.size else SkyCoord([], [], unit='deg')
+
+    # --- Feasibility: which science are coverable at all? (any guide within circle_radius) ---
+    dx_all = sci_xy[:, 0][:, None] - gs_xy[:, 0][None, :]
+    dy_all = sci_xy[:, 1][:, None] - gs_xy[:, 1][None, :]
+    d2_all = dx_all*dx_all + dy_all*dy_all
+    coverable_mask = (d2_all <= (circle_radius**2)).any(axis=1)
+    uncoverable_mask = ~coverable_mask
+
+    if np.any(uncoverable_mask):
+        cn = science[cname_col] if cname_col in science.columns else pd.Series(['<NA>']*np.sum(uncoverable_mask))
+        gid = science[gaia_id_col] if gaia_id_col in science.columns else pd.Series(['<NA>']*np.sum(uncoverable_mask))
+        uncv = pd.DataFrame({
+            'CNAME': np.asarray(cn)[uncoverable_mask],
+            'GAIA_ID': np.asarray(gid)[uncoverable_mask],
+            'RA': sci_coords.ra.deg[uncoverable_mask],
+            'Dec': sci_coords.dec.deg[uncoverable_mask],
+        })
+    else:
+        uncv = pd.DataFrame(columns=['CNAME', 'GAIA_ID', 'RA', 'Dec'])
+
+    # Augment (original behavior)
+    cov = coverage_matrix_for_coords(cand_coords) if cand_idxs.size else np.zeros((sci_xy.shape[0], 0), bool)
+    not_yet_cov = coverable_mask & (~cov.any(axis=1) if cov.shape[1] > 0 else np.ones(cov.shape[0] if cov.size else sci_xy.shape[0], bool))
+    if np.any(not_yet_cov):
+        add_gidx = np.where((d2_all[not_yet_cov, :] <= (circle_radius**2)).any(axis=0))[0]
+        cand_idxs = np.unique(np.concatenate([cand_idxs, add_gidx])) if cand_idxs.size else add_gidx
+        cand_coords = gs_coords[cand_idxs]
+        cov = coverage_matrix_for_coords(cand_coords)
+
+    # Filter weak circles
+    keep_c = cov.sum(axis=0) >= max(1, min_science_per_circle)
+    if not np.any(keep_c):
+        return []
+    cand_idxs = cand_idxs[keep_c]
+    cand_coords = cand_coords[keep_c]
+    cov = cov[:, keep_c]
+
+    # --- Set cover over coverable subset ---
+    cov_eff = cov[coverable_mask, :]  # (Neff, Ncand)
+    if cov_eff.shape[0] == 0:
+        return []
+
+    uncovered = np.ones(cov_eff.shape[0], dtype=bool)
+    order = np.arange(cov_eff.shape[1])
+    rng.shuffle(order)
+
+    chosen_rel = []
+    while uncovered.any():
+        gains = (cov_eff[uncovered, :]).sum(axis=0)
+        j = order[np.argmax(gains[order])]
+        if gains[j] == 0:
+            break
+        chosen_rel.append(j)
+        newly = cov_eff[:, j] & uncovered
+        uncovered[newly] = False
+
+    # Redundancy prune (unchanged)
+    chosen_rel = list(chosen_rel)
+    def prune(choices):
+        changed = True
+        while changed:
+            changed = False
+            for k in list(choices):
+                trial = [t for t in choices if t != k]
+                if len(trial) == 0:
+                    continue
+                if cov_eff[:, trial].any(axis=1).all():
+                    choices.remove(k)
+                    changed = True
+        return choices
+
+    chosen_rel = prune(chosen_rel)
+
+    # Local refinement (unchanged)
+    chosen = np.array(chosen_rel, dtype=int)
+    chosen_xy = np.column_stack([
+        gs_coords[cand_idxs[chosen]].transform_to(off).lon.deg,
+        gs_coords[cand_idxs[chosen]].transform_to(off).lat.deg
+    ])
+
+    improved = True
+    while improved and len(chosen) > 1:
+        improved = False
+        cov_ch = cov_eff[:, chosen]
+        for col_idx in range(len(chosen)):
+            cx, cy = chosen_xy[col_idx]
+            d2_to_all_guides = (gs_xy[:,0] - cx)**2 + (gs_xy[:,1] - cy)**2
+            alt_idxs = np.where(d2_to_all_guides <= (move_radius**2))[0]
+            if alt_idxs.size == 0:
+                continue
+            for g_alt in alt_idxs:
+                alt_vec_full = ((sci_xy[:,0] - gs_xy[g_alt,0])**2 +
+                                (sci_xy[:,1] - gs_xy[g_alt,1])**2) <= (circle_radius**2)
+                alt_vec = alt_vec_full[coverable_mask]
+                trial_cols = cov_eff[:, chosen].copy()
+                trial_cols[:, col_idx] = alt_vec
+                if not trial_cols.any(axis=1).all():
+                    continue
+                active = list(range(trial_cols.shape[1]))
+                changed = True
+                while changed:
+                    changed = False
+                    for k in list(active):
+                        trial = [t for t in active if t != k]
+                        if len(trial) == 0:
+                            continue
+                        if trial_cols[:, trial].any(axis=1).all():
+                            active.remove(k)
+                            changed = True
+                if len(active) < len(chosen):
+                    if g_alt not in cand_idxs:
+                        cand_idxs = np.append(cand_idxs, g_alt)
+                        new_col = alt_vec[:, None]
+                        cov_eff = np.hstack([cov_eff, new_col])
+                        chosen[col_idx] = cov_eff.shape[1] - 1
+                    else:
+                        abs_idx = np.where(cand_idxs == g_alt)[0][0]
+                        chosen[col_idx] = abs_idx
+                    chosen = chosen[active]
+                    chosen_xy = np.column_stack([
+                        gs_coords[cand_idxs[chosen]].transform_to(off).lon.deg,
+                        gs_coords[cand_idxs[chosen]].transform_to(off).lat.deg
+                    ])
+                    improved = True
+                    break
+            if improved:
+                break
+
+    final_coords = gs_coords[cand_idxs[chosen]] if len(chosen) else SkyCoord([], [], unit='deg')
+    centers = list(zip(final_coords.ra.deg, final_coords.dec.deg))
+    return centers
+
+
+def prune_circles(catalogue_df, circles,
+                  ra_col="GAIA_RA",
+                  dec_col="GAIA_DEC",
+                  flag_col="sourceFlag",
+                  ref_circle_idx=None, 
+                  ref_ra=None, ref_dec=None,
+                  circle_radius_deg=0.98,
+                  chunk_size_targets=100_000):
+    """
+    Parameters
+    ----------
+    catalogue_df : pd.DataFrame
+        Must contain RA/Dec and sourceFlag.
+    circles : list[tuple]
+        Either [(ra, dec), ...] or [(id, ra, dec), ...] in degrees.
+    ref_circle_idx : int, optional
+        Index into `circles` to use as the reference circle.
+    ref_ra, ref_dec : float, optional
+        Reference circle centre if you don't pass ref_circle_idx.
+    circle_radius_deg : float
+        Circle radius (assumed same for all).
+    chunk_size_targets : int
+        Chunk size for separation computations.
+
+    Returns
+    -------
+    kept_circle_indices : list[int]
+        Indices in the ORIGINAL `circles` list that remain after pruning.
+    removed_circle_indices : list[int]
+        Indices in the ORIGINAL `circles` list that were removed as redundant.
+    kept_circles : list[tuple]
+        The corresponding circle tuples from the ORIGINAL `circles` list.
+    coverage_lut : pd.DataFrame
+        Long-form table: columns ['circle_idx','target_index'] mapping each kept/intersecting
+        circle to the science targets (row index into `science_df`) it covers.
+    science_df : pd.DataFrame
+        Subset of `catalogue_df` where sourceFlag != 9, index reset.
+    intersecting_circle_indices : list[int]
+        All intersecting circle indices BEFORE pruning.
+    circle_ids : list
+        List of IDs if provided in the input tuples; otherwise equals kept_circle_indices.
+    """
+
+    # ---- parse circle tuples ----
+    # Accept (ra, dec) or (id, ra, dec)
+    ids = []
+    ras = []
+    decs = []
+    has_ids = False
+    for tup in circles:
+        if len(tup) == 2:
+            ra, dec = tup
+            ids.append(None)
+            ras.append(float(ra))
+            decs.append(float(dec))
+        elif len(tup) == 3:
+            cid, ra, dec = tup
+            ids.append(cid)
+            ras.append(float(ra))
+            decs.append(float(dec))
+        else:
+            raise ValueError("Each circle tuple must be (ra, dec) or (id, ra, dec).")
+
+    circle_ids = ids  # may be all None
+    ras = np.asarray(ras, dtype=float)
+    decs = np.asarray(decs, dtype=float)
+
+    # ---- reference circle selection ----
+    if (ref_circle_idx is None) == (ref_ra is None or ref_dec is None):
+        raise ValueError("Provide either ref_circle_idx OR (ref_ra and ref_dec), but not both.")
+
+    if ref_circle_idx is not None:
+        if not (0 <= ref_circle_idx < len(circles)):
+            raise IndexError("ref_circle_idx out of range.")
+        ref_ra = ras[ref_circle_idx]
+        ref_dec = decs[ref_circle_idx]
+
+    # science targets only
+    science_df = catalogue_df[catalogue_df[flag_col] != 9].reset_index(drop=True)
+    sci_coords = SkyCoord(science_df[ra_col].to_numpy()*u.deg,
+                          science_df[dec_col].to_numpy()*u.deg, frame="icrs")
+
+    # intersecting circles
+    ref_center = SkyCoord(ref_ra*u.deg, ref_dec*u.deg, frame="icrs")
+    all_centers = SkyCoord(ras*u.deg, decs*u.deg, frame="icrs")
+    sep_to_ref = all_centers.separation(ref_center).deg
+    intersect_mask = sep_to_ref <= (360.0 + 1e-12)
+    intersecting_idx = np.nonzero(intersect_mask)[0].tolist()
+    intersecting_circle_indices = intersecting_idx[:]  # before pruning
+
+    # coverage computation
+    R = circle_radius_deg
+    coverage = {}           # idx -> set(target_index)
+    coverage_rows = []      # (circle_idx, target_index)
+
+    N_sci = len(science_df)
+    target_chunks = [slice(i, min(i+chunk_size_targets, N_sci))
+                     for i in range(0, N_sci, chunk_size_targets)]
+
+    inter_ras = ras[intersecting_idx]
+    inter_decs = decs[intersecting_idx]
+    inter_centers = SkyCoord(inter_ras*u.deg, inter_decs*u.deg, frame="icrs")
+
+    for j, cidx in enumerate(intersecting_idx):
+        c_center = inter_centers[j:j+1]
+        covered_idx = []
+        for sl in target_chunks:
+            seps = sci_coords[sl].separation(c_center).deg
+            inside = np.where(seps <= R + 1e-12)[0]
+            if inside.size:
+                covered_idx.extend((inside + sl.start).tolist())
+        s = set(covered_idx)
+        coverage[cidx] = s
+        coverage_rows.extend([(cidx, k) for k in s])
+
+    # drop circles that cover no science at all
+    # intersecting_idx = [c for c in intersecting_idx if len(coverage[c]) > 0]
+
+    #coverage_lut = pd.DataFrame(coverage_rows, columns=["circle_idx", "target_index"])
+
+    # redundancy pruning (no science loss)
+    remaining = set(intersecting_idx)
+    removed = []
+
+    # remove smallest-coverage circles first
+    ordered = sorted(remaining, key=lambda c: len(coverage[c]))
+    for c in ordered:
+        if c not in remaining:
+            continue
+        others = remaining - {c}
+        union_others = set().union(*(coverage[o] for o in others)) if others else set()
+        if coverage[c].issubset(union_others):
+            remaining.remove(c)
+            removed.append(c)
+
+    #removed_circle_indices = removed[:]
+    kept_circles = [circles[i] for i in sorted(remaining)]
+
+    # Resolve output IDs (if present)
+    #out_ids = [circle_ids[i] if circle_ids[i] is not None else i for i in kept_circle_indices]
+
+    return kept_circles
+
+
 def define_fields(catalogue_df,
                   fixed_grid=False,
                   circles_df=None,
+                  prune_fields=False,
                   batch_size=3,
                   max_passes=5,
                   merge_threshold=3,
                   radius=0.98,
                   central_star_mag_lim=16.,
                   grid_offset=1.0,
-                  n_clusters=None,
-                  exo_subset=False,
-                  exo_radius=2.5,
-                  max_exo_fields=4,
-                  candidates_only=False,
                   ra_col='GAIA_RA',
                   de_col='GAIA_DEC',
                   mag_col='GAIA_MAG_G',
@@ -1410,6 +1995,18 @@ def define_fields(catalogue_df,
             spacing=grid_offset,
             match_radius=1.0)
 
+    # Remove redundant fields (no science targets or covered by other circles)
+    if len(circles) == 0:
+        logging.error("No fields were placed. Check input catalogue and parameters.")
+
+    if prune_fields:
+        pruned_circles = prune_circles(catalogue_df, circles,
+                                       ra_col="GAIA_RA", dec_col="GAIA_DEC",
+                                       flag_col="sourceFlag", ref_circle_idx=0,
+                                       circle_radius_deg=radius)
+
+        circles = pruned_circles
+
     # Assign stars to circles
     catalogue_df, guide_look_up_df = assign_stars_to_circles(catalogue_df, circles,
                                                              max_passes=max_passes,
@@ -1435,20 +2032,6 @@ def define_fields(catalogue_df,
            f'Science: {stars_in_circles[~stars_in_circles["sourceFlag"].isin([9])].shape[0]}\n'
            f'Guide: {stars_in_circles[stars_in_circles["sourceFlag"].isin([9])].shape[0]}')
 
-    # Optionally assign batches to exoplanet candidate fields
-    if exo_subset:
-        (stars_in_circles,
-         circles_df,
-         num_batches) = assign_exoplanet_batch_id(stars_in_circles,
-                                                  circle_coord_df=circles_df,
-                                                  exo_radius=exo_radius,
-                                                  max_exo_fields=max_exo_fields,
-                                                  candidates_only=candidates_only,
-                                                  ra_col=ra_col, de_col=de_col)
-                                                  
-        print(f'Nr. of field batches: {num_batches}')
-        print('Nr. of targets in exoplanet batches:', stars_in_circles.shape)
-        return stars_in_circles, circles_df
 
     # Standard batch assignment
     if (batch_size < 3) and (batch_size > 0):

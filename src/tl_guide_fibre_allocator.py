@@ -1,10 +1,14 @@
+import logging
+
 import pandas as pd
 import numpy as np
-from astropy import units as u
 import xml.etree.ElementTree as ET
+
+from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy import wcs
-import logging
+
+from tl_protofielding import assign_targprog
 
 
 def check_guide_fibre_status(fibre_status_xml,
@@ -118,17 +122,59 @@ def zpn_projection(batch,
     return batch_projected
 
 
-def assign_fibre_ids(df, fibre_ids, mag_col='gaiaV', src_id='GAIA_ID'):
+def assign_fibre_ids(df,
+                     fibre_ids,
+                     mag_col='GAIA_MAG_G',
+                     src_id='GAIA_ID'):
     """
-    Assigns fibre IDs to stars reachable to the guide fibres. It selects stars from the sample
-    of reacahbel stars so that every field in a batch has at least one central and 2
-    additional guide stars, if possible.
+    Allocate guide-fibre IDs to reachable guide stars, aiming to ensure that each field in a
+    batch has at least one central guide and two additional guides (when possible).
+    Stars competing for the same fibre are resolved by brightness (the smallest value in
+    `mag_col` gets selected). The alglorithm runs until a stable configuration is reached or
+    a maximum number of iterations is exceeded. A stable configuration is one where no further
+    changes occur in the allocation of fibre IDs. To enable this the allocation workflow
+    maintains a live pool of free fibre IDs and, on each pass,
+    reconciles the current frame against the initial assignment.
+    When multiple candidates contend for an already-used fibre, the brightest star keeps
+    (or receives) that fibre. After a stable configuration is reached, one of the remaining
+    free fibres is assigned to the central guide star (with exception of fibreid 1005, this
+    fibre is not able to reach the centre). Fobre 1005 is therefore prioritized, when
+    selecting off-center fibres.
 
     Args:
-        df (pd.DataFrame): DataFrame containing star data
-        fibre_ids (np.array): Array of available fibre IDs.
-        mag_col (str): Column name for the star magnitudes. Defaults to 'gaiaV'.
-        src_id (str): Column name for the source ID. Defaults to 'sourceId'.
+        df (pd.DataFrame): Input table of candidate stars. Must contain:
+            - a unique identifier column named by `src_id`,
+            - a magnitude column named by `mag_col` (smaller = brighter),
+            - a writable/nullable `fibreId` column (created if missing),
+            - any additional columns your calling code requires for per-field logic
+              (e.g., `fieldId`, `guide`), if used upstream.
+        fibre_ids (np.ndarray): Array of available guide-fibre IDs that can be assigned.
+        mag_col (str, optional): Column with magnitudes used for brightness ranking.
+            Defaults to 'gaiaV'.
+        src_id (str, optional): Column name holding the star identifier used to match and
+            assign fibres. Defaults to 'GAIA_ID'.
+
+    Returns:
+        pd.DataFrame: A copy of `df` with the `fibreId` column populated for stars that
+        received an allocation. Previously assigned fibres are preserved when possible,
+        and conflicts are resolved in favor of the brightest star.
+
+    Notes:
+        - The allocation pool excludes any IDs already present in `df['fibreId']`. If the
+          special constant `AVOID_CENTRAL_FIBRE_ID` has been assigned anywhere, that ID
+          is permanently removed from the free pool and will not be reused.
+        - Conflict resolution compares the current working frame with an `initial_assignment`
+          snapshot to stabilize assignments across passes. Ensure your calling code defines
+          `initial_assignment = df.copy()` (or equivalent) before iterative updates, and
+          maintains a consistent `free_fibre_ids` pool across calls if you allocate in
+          multiple stages.
+        - Brightness is defined by ascending values in `mag_col` (i.e., lower is brighter).
+        - The function assumes that input rows are already filtered to “reachable” stars for
+          the guide fibres; reachability checks are not performed here.
+
+    Raises:
+        KeyError: If required columns (e.g., `src_id`, `mag_col`) are missing from `df`.
+        ValueError: If `fibre_ids` is empty or contains non-integer values.
     """
 
     def _update_free_fibre_ids(df, fibre_ids):
@@ -136,8 +182,8 @@ def assign_fibre_ids(df, fibre_ids, mag_col='gaiaV', src_id='GAIA_ID'):
         alloc_fib_ids = df['fibreId'].dropna().astype(int, errors='ignore')
         free = fibre_ids[~np.isin(fibre_ids, alloc_fib_ids)]
         # If 1005 is assigned anywhere, never consider it free again
-        if (alloc_fib_ids == AVOID_CENTRAL_FIBRE_ID).any():
-            free = free[free != AVOID_CENTRAL_FIBRE_ID]
+        if (alloc_fib_ids == _AVOID_CENTRAL_FIBRE_ID).any():
+            free = free[free != _AVOID_CENTRAL_FIBRE_ID]
         return free
 
     def _update_fibres(frame):
@@ -206,7 +252,7 @@ def assign_fibre_ids(df, fibre_ids, mag_col='gaiaV', src_id='GAIA_ID'):
         to_drop = []
         for _, g in valid_fields.groupby('fieldId'):
             # do not drop the star holding 1005 (keeps 1005 from becoming free)
-            cand = g[g['fibreId'] != AVOID_CENTRAL_FIBRE_ID]
+            cand = g[g['fibreId'] != _AVOID_CENTRAL_FIBRE_ID]
             if cand.empty:
                 continue  # nothing to drop without touching 1005
             to_drop.append(cand[mag_col].idxmax())  # drop faintest among non-1005
@@ -220,8 +266,8 @@ def assign_fibre_ids(df, fibre_ids, mag_col='gaiaV', src_id='GAIA_ID'):
     # ######################### Main Logic #########################
 
     # Fibre 1005 cannot reach the centre of the field plate, the variable below ensures that.
-    # THIS SHOULD NOT BE CHANGED!!!
-    AVOID_CENTRAL_FIBRE_ID = 1005
+    # THIS MUST NOT BE CHANGED!!!
+    _AVOID_CENTRAL_FIBRE_ID = 1005
 
     # Initial assignment of stars with relevant columns
     # before the per-field loop
@@ -350,27 +396,74 @@ def assign_guide_fibres(merged_df,
                         broken_fibres=None):
 
     """
-    Assigns guide fibres to stars in the merged DataFrame based on their positions.
+    Assign WEAVE guide-fibre IDs to guide stars field-by-field using the instrument
+    gate geometry, plate, hemisphere, and a broken-fibre mask. Only guide stars
+    (`sourceFlag == 9`) are considered. For each field, the routine:
+      1) identifies the central guide (row(s) with `guide == 1`) and switches to the
+         superposition-frame coordinates (`Vx`, `Vy`) for geometry,
+      2) determines the target gate positions/angles for the active plate/hemisphere,
+         masking out any broken fibres,
+      3) filters candidate guides (`guide == 0`) to those inside each gate's triangular
+         reach region (limited by `max_gate_angle` and `guide_reach_factor`), and
+      4) calls `assign_fibre_ids(...)` to allocate specific `fibreId`s to the valid
+         candidates, resolving conflicts by brightness (`mag_col`).
+
+    The output is the per-batch DataFrame with guide assignments in `fibreId`: central
+    guides keep their role and are added back; non-central assigned guides are tagged
+    with `guide == 2`. If a field has no valid assignments, it is skipped.
 
     Args:
-        merged_df (pd.DataFrame): DataFrame containing the stars.
-        max_gate_angle (float): Maximum angle in degrees for the guide fibre gates.
-        hemisphere (str): _hemisphere_ of the observation, either 'north' or 'south'.
-        plate (str): _plate_ identifier, either 'A' or 'B'.
-        guide_mag_limit (float, optional): Maximum magnitude limit for guide stars.
-                                           Defaults to None.
-        mag_col (str, optional): Column name for the star magnitudes. Defaults to 'gaiaV'.
-        ra_col (str, optional): Name for RA column. Defaults to 'ra'
-        de_col (str, optional): Name for DEC column. Defaults to 'dec'.
-        src_id (str, optional): Name for source ID column. Defaults to 'sourceId'.
-        guide_reach_factor (float, optional): Factor defining the region reachable
-                                              for the guide fibres. This avoids crossing
-                                              of the fibres. Defaults to 12.0.
-                                              Best not to change!!!!
+        merged_df (pd.DataFrame): Input table containing **only the batch under
+            consideration**. Must include at least:
+            - `fieldId` (int): field identifier,
+            - `sourceFlag` (int): 9 for guide stars,
+            - `guide` (int): 1 for the central guide of the field, 0 for other candidates,
+            - `X`, `Y` (float): star coordinates in the superposition frame,
+            - `Vx`, `Vy` (float): central guide coordinates in the same frame,
+            - columns named by `mag_col`, `ra_col`, `de_col`, `src_id` (see below).
+        max_gate_angle (float): Half-opening angle (degrees) of a gate's reach cone.
+        hemisphere (str): Observation hemisphere, 'N' (north) or 'S' (south). Affects
+            fibre-ID ordering/rotation.
+        plate (str): Plate identifier, 'A' or 'B'. Used with `broken_fibres`.
+        guide_mag_limit (float, optional): Maximum magnitude for guide candidates. If
+            provided, fainter stars are excluded before allocation. Defaults to None.
+        mag_col (str, optional): Magnitude column used for ranking (lower = brighter).
+            Defaults to 'gaiaV'.
+        ra_col (str, optional): Right Ascension column (degrees). Defaults to 'ra'.
+        de_col (str, optional): Declination column (degrees). Defaults to 'dec'.
+        src_id (str, optional): Source identifier column used when allocating fibres.
+            Defaults to 'sourceId'.
+        guide_reach_factor (float, optional): Multiplier used to offset the gate-cone
+            edges to reduce fibre crossings (acts on cone length correction).
+            Defaults to 12.0 (do not change unless you understand the geometry).
+        broken_fibres (dict | None, optional): Mapping like
+            `{ 'A': [ids...], 'B': [ids...] }` listing broken fibre IDs per plate.
+            Broken fibres are masked out and never allocated. Defaults to None
+            (treated as no broken fibres).
 
-        broken_fibres (dict, optional): Dictionary containing broken fibre IDs.
-                                          If not provided, it will be set to None,
-                                          resulting in an all guide-fibres-enabled case.
+    Returns:
+        pd.DataFrame | None: The batch DataFrame with assigned guide fibres:
+            - `fibreId` set on selected non-central guides,
+            - central guides re-added with their `fibreId` (returned by `assign_fibre_ids`),
+            - non-central, fibre-assigned guides marked with `guide == 2`,
+            - columns `Vx`, `Vy` dropped from the output.
+            Returns `None` if no valid fields produced assignments.
+
+    Notes:
+        - The function **filters to `sourceFlag == 9` internally**; science targets are
+          not considered here.
+        - Fibre IDs are hard-coded for WEAVE and rotated between hemispheres; a small
+          fixed offset (`fibre_pa_offset`) is applied to target angles.
+        - Reach regions are modeled as triangles (gate vertex plus two rays at
+          `±max_gate_angle`), and candidate guides are selected if their (`X`, `Y`)
+          lies inside the triangle.
+        - Final per-fibre selection among candidates is brightness-based and delegated
+          to `assign_fibre_ids(...)`, which also preserves/stabilizes allocations.
+
+    Raises:
+        KeyError: If required columns are missing (e.g., `fieldId`, `sourceFlag`,
+          `guide`, `X`, `Y`, `Vx`, `Vy`, `mag_col`, `src_id`).
+        ValueError: If `hemisphere` not in {'N','S'} or `plate` not in {'A','B'}.
     """
 
     def _is_point_in_triangle(pt, A, B, C):
@@ -463,6 +556,8 @@ def assign_guide_fibres(merged_df,
 
         return df[mask]
 
+    # ######################### Main Logic #########################
+
     batch_frames = []
     central_stars = []
     fibre_pa_offset = 0.5442  # Offset of the fibre tier relative to the unit circle angles
@@ -529,7 +624,6 @@ def assign_guide_fibres(merged_df,
 
         # Reconstruct field/fibre gate geometry check if stars are within the reachable
         # region of the guide fibres. Then assign the fibre IDs to the valid stars.
-        # possible TODO: Account for sky position angle of the field
 
         gate_dist = 273.76237
         field_frames = []
@@ -1674,8 +1768,6 @@ def run_guide_fibre_allocation(df_field_selection,
         None
     """
 
-    from twilight_protofielding import assign_targprog
-
     def _match_field_ids_w_lookup_table(lut_val, field_ids):
         parts = lut_val.split('_')
         return any(part in field_ids for part in parts)
@@ -1787,7 +1879,8 @@ def run_guide_fibre_allocation(df_field_selection,
             continue
 
         # Add the queried guide stars to the current batch.
-        batch = pd.concat([batch, guide_star_rows], ignore_index=True).astype({src_id_col: 'str'})
+        batch = pd.concat([batch, guide_star_rows], ignore_index=True).astype(
+                                                                           {src_id_col: 'str'})
 
         # Set batchId for the added guide stars that have no batchId set
         batch.loc[batch['batchId'].isna(), 'batchId'] = batch['batchId'].unique()[0]

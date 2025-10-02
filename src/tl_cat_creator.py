@@ -1,9 +1,48 @@
 import pandas as pd
+import numpy as np
 import os
 from astropy.io import fits
 import healpy as hp
 from astropy.table import Table
 from workflow.utils.get_resources import get_guide_cat
+
+
+def add_healpix_id(df,
+                   ra_col='ra',
+                   de_col='dec',
+                   hp_col='healpixId',
+                   nside=32,
+                   nested=True):
+    """
+    Adds a new column to the dataframe containing the HEALPix ID based on RA and Dec
+    coordinates.
+
+    Parameters:
+        df: pandas DataFrame containing the RA and Dec coordinates
+        ra_col: name of the column containing the RA coordinates (default 'RA')
+        dec_col: name of the column containing the Dec coordinates (default 'Dec')
+        hp_col: name of the new column to store HEALPix IDs (default 'healpixId')
+        nside: NSIDE parameter for HEALPix (default 32)
+        nested: whether to use nested ordering for HEALPix (default True)
+
+    Returns:
+     df: The inputted pandas DataFrame with a new column 'healpix_id' containing
+         the HEALPix IDs tailored to the WEAVE guide star cataogue HP grid.
+    """
+
+    df = df.copy()
+
+    # Convert RA and Dec to theta and phi
+    theta = np.radians(90.0 - df[de_col].values)  # colatitude
+    phi = np.radians(df[ra_col].values)            # longitude
+
+    # Compute HEALPix IDs
+    healpix_id = hp.ang2pix(nside, theta, phi, nest=nested)
+
+    # Add HEALPix IDs to the dataframe
+    df.loc[:, hp_col] = np.int64(healpix_id)
+
+    return df
 
 
 def query_weave_guide_stars(healpix_ids,
@@ -77,13 +116,18 @@ def query_weave_guide_stars(healpix_ids,
                 dfs.append(df)
             hpid = file_path.split('/')[-1].replace('.fits', '').split('_')[1]
             hpids.append(hpid)
+
         finally:
             if os.path.exists(file_path) and not cache:
                 os.remove(file_path)
 
         if split_nr is not None and len(dfs) == split_nr:
             combined = pd.concat(dfs, ignore_index=True)
-            parquet_name = f'{base_name}_all.parquet' if split_nr is None else f'{base_name}_' + '_'.join(hpids) + '.parquet'
+            if split_nr is None:
+                parquet_name = f"{base_name}_all.parquet"
+            else:
+                parquet_name = f"{base_name}_{'_'.join(hpids)}.parquet"
+
             parquet_path = os.path.join(out_dir, parquet_name)
             combined.to_parquet(parquet_path, index=False)
             dfs.clear()
@@ -92,7 +136,12 @@ def query_weave_guide_stars(healpix_ids,
 
     if dfs:
         combined = pd.concat(dfs, ignore_index=True)
-        parquet_name = f'{base_name}_all.parquet' if split_nr is None else f'{base_name}_' + '_'.join(hpids) + '.parquet'
+        if split_nr is None:
+            suffix = "all"
+        else:
+            suffix = "_".join(hpids)
+
+        parquet_name = f"{base_name}_{suffix}.parquet"
         parquet_path = os.path.join(out_dir, parquet_name)
         combined.to_parquet(parquet_path, index=False)
 
@@ -142,11 +191,13 @@ if __name__ == "__main__":
     with fits.open("./WS2025XX-XXX.fits") as hdu:
         cat_df = Table(hdu[1].data).to_pandas()
 
-    healpix_ids = [2881, 2880, 2539]
+    cat_df = add_healpix_id(cat_df, ra_col='GAIA_RA', de_col='GAIA_DEC',
+                            hp_col='healpixId', nside=32, nested=True)
+
+    healpix_ids = cat_df['healpixId'].unique()
 
     # Query guide stars. In real use case neighbour_hp should be set to True,
     # here set to False to limit the number of queried stars.
-
     query_weave_guide_stars(healpix_ids, split_nr=None,
                             out_dir='./resources/WG',
                             base_name='WG_',

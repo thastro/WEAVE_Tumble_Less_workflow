@@ -2,9 +2,8 @@ import os
 import pandas as pd
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
-
+# import matplotlib.pyplot as plt
+# from matplotlib.patches import Circle
 
 import logging
 import time
@@ -24,7 +23,7 @@ from workflow.utils.classes._guide_and_calib_stars import CalibStars as _CalibSt
 from workflow.utils.get_resources import (get_blank_xml_template,
                                           get_progtemp_file,
                                           get_obstemp_file)
-from workflow.utils import get_version
+# from workflow.utils import get_version # Currently not used. will likely be re-used later
 from workflow.utils.get_obstemp_info import (get_obstemp_info,
                                              get_obstemp_dict)
 
@@ -415,17 +414,17 @@ class TLOBXML(OBXML):
         # compare guide stars to guide_star csv
         # if guide stars are in csv, add them to the xml
         guides_star_frame_WG = guides_table.to_pandas()
-        #print(self.guide_star_batch['GAIA_ID'])
-        #print(guides_star_frame_WG['GAIA_ID'].head(5))
+        # print(self.guide_star_batch['GAIA_ID'])
+        # print(guides_star_frame_WG['GAIA_ID'].head(5))
         # Check if assignd guide stars are in the query selection
         match_frame = guides_star_frame_WG[guides_star_frame_WG['GAIA_ID'].isin(
                                            self.guide_star_batch['GAIA_ID'])]
-        #print(match_frame[['GAIA_ID', 'GAIA_RA', 'GAIA_DEC']])
+        # print(match_frame[['GAIA_ID', 'GAIA_RA', 'GAIA_DEC']])
 
         # Drop duplicates (central guide star) TODO: Fix this, so drop duplicates is not needed
         match_frame = match_frame.drop_duplicates(subset='GAIA_ID',
                                                   keep='first').reset_index(drop=True)
-        #print(match_frame[['GAIA_ID', 'GAIA_RA', 'GAIA_DEC']]),
+        # print(match_frame[['GAIA_ID', 'GAIA_RA', 'GAIA_DEC']]),
         if verbose:
             print('Input guide stars:')
             print(self.guide_star_batch[['GAIA_ID', 'fieldId',
@@ -433,7 +432,7 @@ class TLOBXML(OBXML):
         match_frame = pd.merge(match_frame, self.guide_star_batch[['GAIA_ID', 'fibreId']],
                                on='GAIA_ID', how='left')
 
-        #match_frame = match_frame.drop(columns=['GAIA_ID'])
+        # match_frame = match_frame.drop(columns=['GAIA_ID'])
         match_frame = match_frame.rename(columns={'fibreId': 'FIBREID'})
 
         if verbose:
@@ -568,7 +567,8 @@ class TLOBXML(OBXML):
                                   add_cnames=add_cnames)
 
     def _set_guide_star_batch(self, guide_star_frame):
-        self.guide_star_batch = guide_star_frame.reset_index(drop=True).astype({'GAIA_ID': str})
+        self.guide_star_batch = guide_star_frame.reset_index(drop=True).astype(
+                                                                              {'GAIA_ID': str})
 
     def set_tl_exposures(self, expcal_file, exposure_time, progtemp, num_science_exposures=1):
 
@@ -1530,11 +1530,11 @@ def create_central_target_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra'
     cat_frame = assign_targprog(catalogue_df=cat_frame)
 
     # Rename columns
-    #cat_frame = cat_frame.rename(columns={src_id: 'NAME', ra_col: 'RA', de_col: 'DEC',
-     #                                     mag_col: 'GAIA_MAG_G'})
+    # cat_frame = cat_frame.rename(columns={src_id: 'NAME', ra_col: 'RA', de_col: 'DEC',
+    #                                     mag_col: 'GAIA_MAG_G'})
 
     # Ensure the output directory exists
-    # output_dir = Path(output_dir)
+    # output_dir = output_dir
     # output_dir.mkdir(parents=True, exist_ok=True)
 
     # Save to CSV
@@ -1563,8 +1563,9 @@ def create_guide_stars_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra', d
                                                                        'fibreId',
                                                                        'batchId',
                                                                        'fieldId']].astype(int)
-    #cat_frame = cat_frame.rename(columns={src_id: 'NAME', ra_col: 'RA',
-     #                                     de_col: 'DEC'})
+    # cat_frame = cat_frame.rename(columns={src_id: 'NAME', ra_col: 'RA',
+    #                                     de_col: 'DEC'})
+
     if hemisphere is not None:
         csv_name = f'guide_stars_{plate}_{hemisphere}.csv'
     else:

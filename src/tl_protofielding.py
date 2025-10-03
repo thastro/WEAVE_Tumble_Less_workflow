@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-
 import numpy as np
+
 # import matplotlib.pyplot as plt
 # from matplotlib.patches import Circle
 
@@ -35,18 +35,18 @@ from workflow.utils.get_progtemp_info import (get_progtemp_dict,
 class TLOBXML(OBXML):
     """ Modified OBXML Class for WEAVE MOS XML creation
 
-    This class builds upon the IFU workflow OBXML class, adds new functionality
-    necessary to allow for WEAVE-TL OBs. Unless specifically
+    This class builds upon the IFU/MOS workflow OBXML class, adds new functionality
+    necessary to allow for WEAVE-TL (Tumble-Less) OBs. Unless specifically
     overwritten by the new attributes below, all functionality is inherited from
     the base OBXML class.
     """
 
-    def create_and_prepare_fields(self, field_ra, field_dec, centr_target_table):
+    def create_and_prepare_fields(self, field_ra, field_dec, central_target_table):
 
         field_template = self.fields.getElementsByTagName('field')[0].cloneNode(True)
 
-        field_coord_table = centr_target_table[['GAIA_ID', 'GAIA_RA', 'GAIA_DEC',
-                                                'TARGPROG', 'TARGID']]
+        field_coord_table = central_target_table[['GAIA_ID', 'GAIA_RA', 'GAIA_DEC',
+                                                  'TARGPROG', 'TARGID']]
 
         targprog = field_coord_table[(field_coord_table['GAIA_RA'] == field_ra) &
                                      (field_coord_table['GAIA_DEC'] == field_dec)
@@ -134,22 +134,6 @@ class TLOBXML(OBXML):
         self.fields.appendChild(field_element)
 
     def set_tl_fields(self, field_ra, field_dec):
-
-        # col_to_attrib_dict = {
-        #                     'TARGSRVY': 'targsrvy',
-        #                      'TARGPROG': 'targprog',
-        #                      'TARGID': 'targid',
-        #                      'TARGNAME': 'targname',
-        #                      'TARGPRIO': 'targprio',
-        #                      'GAIA_RA': 'targra',
-        #                      'GAIA_DEC': 'targdec',
-        #                      'GAIA_EPOCH': 'targepoch',
-        #                      'GAIA_PMRA': 'targpmra',
-        #                      'GAIA_PMDEC': 'targpmdec',
-        #                      'GAIA_PARAL': 'targparal'
-        #                    }
-
-        # Get an empty field element to use it as template
 
         field_list = self.fields.getElementsByTagName('field')
         field_template = field_list[0].cloneNode(True)
@@ -541,18 +525,6 @@ class TLOBXML(OBXML):
                                  cache=cache,
                                  mag_lim=guide_mag_lim, verbose=verbose)
 
-        # Not needed for now
-        """
-        self._add_guide_stars(plot_filename=guide_plot_filename,
-                            useful_table_filename=guide_useful_table_filename,
-                            mos_num_stars_request=mos_num_guide_stars_request,
-                            mos_num_central_stars=mos_num_central_guide_stars,
-                            mos_min_cut=mos_min_guide_cut,
-                            mos_max_cut=mos_max_guide_cut,
-                            dyn_range_lim=dyn_range_lim,
-                            cache=cache,
-                            mag_lim=guide_mag_lim)
-        """
         if calib_stars:
             self._add_calib_stars(resolution=resolution,
                                   plot_filename=calib_plot_filename,
@@ -878,9 +850,10 @@ class TLDriverCat:
                     try:
                         self.header_values[key].append(hdu_list[0].header[key])
 
-                    except:
+                    except Exception as e:
                         logging.warning(f'"{key}" FITS header keywords not present -' +
-                                        'submission may fail WASP')
+                                        'submission may fail WASP'
+                                        f"(Exception: {e})")
                         self.header_values[key] = ['']
 
                 data.append(Table(hdu_list[1].data))
@@ -898,9 +871,10 @@ class TLDriverCat:
                     assert (np.array(self.header_values[key]) ==
                             self.header_values[key][0]).all()
 
-                except:
+                except Exception as e:
                     logging.warning(f'"{key}" FITS Header keywords' +
-                                    'do not all match:' + f'{self.header_values[key]}')
+                                    'do not all match:' + f'{self.header_values[key]}'
+                                    f"(Exception: {e})")
 
         if xml_template is None:
             self.xml_template = 'BlankXMLTemplate.xml'
@@ -929,7 +903,7 @@ class TLDriverCat:
             self.expcal_json = expcal_json
 
 # #############################################################################################
-# ########################## Newly added tl ob creation function ##############################
+# ########################## Newly added tl ob creation main function #########################
 
     def process_tl_ob(self,
                       batch_id,
@@ -1255,10 +1229,11 @@ class TLDriverCat:
                     survey.setAttribute('priority',
                                         str(np.clip(targsrvy_dict[f"{sname}_priority"],
                                             0.0, 1.0)))
-                except:
-                    raise
+                except Exception as e:
                     logging.warning(
-                        f"TARGSRVY {sname} values not present in dict, leaving as default")
+                        f"TARGSRVY {sname} values not present in dict, leaving as default "
+                        f"(Error: {e})")
+                    raise
 
         # Probably not needed
         # self.catmask = field_centre.separation(catalog) < radius*u.deg
@@ -1483,7 +1458,7 @@ class TLDriverCat:
 
 # #############################################################################################
 
-# ################# Newly added functions to create target/guidestar csv ######################
+# ############## Newly added functions to create target/guidestar catalogues ##################
 
 
 def create_central_target_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra', de_col='dec',
@@ -1574,34 +1549,116 @@ def create_guide_stars_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra', d
     cat_frame.to_csv(output_dir + csv_name, index=False)
 
 
-def assign_obstemp(catalogue_df, obstemp):
+def assign_obstemp(catalogue_df,
+                   obstemp):
+    """
+    Assign correct OBSTEMP to science targets and guide stars (sourceFlag=9).
+
+    Args:
+        catalogue_df (pd.DataFrame): DataFrame containing the catalogue
+        obstemp (str): OBSTEMP value to assign
+
+    Returns:
+        pd.DataFrame: Updated DataFrame with assigned OBSTEMP
+    """
     catalogue_df['obstemp'] = obstemp
     catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'obstemp'] = 'XXXXX'
     return catalogue_df
 
 
-def assign_progtemp(catalogue_df, progtemp):
+def assign_progtemp(catalogue_df,
+                    progtemp):
+    """
+    Assign correct PROGTEMP to science targets and guide stars (sourceFlag=9).
+
+    Args:
+        catalogue_df (pd.DataFrame): DataFrame containing the catalogue
+        progtemp (str): PROGTEMP value to assign
+
+    Returns:
+        pd.DataFrame: Updated DataFrame with assigned PROGTEMP
+    """
+
     catalogue_df['progtemp'] = str(progtemp)
     catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'progtemp'] = '00000.0'
     return catalogue_df
 
 
 def assign_targprog(catalogue_df):
+    """
+    Assigns TARGPROG for every target based on batchId and fieldId. This specific TARGPROG
+    will only be present in the XML files, and remains unchanged in the input catalogue!
+
+    Example: batchId = 1 and fieldId = 42 -> TARGPROG = '1_42', dtype=str
+
+    Args:
+        catalogue_df (pd.DataFrame): DataFrame containing the catalogue
+
+    Returns:
+        pd.DataFrame: Updated DataFrame with assigned TARGPROG
+    """
+
     batch_ids = catalogue_df['batchId'].astype(int)
     field_ids = catalogue_df['fieldId'].astype(int)
     catalogue_df.loc[:, 'TARGPROG'] = batch_ids.astype(str) + '_' + field_ids.astype(str)
     return catalogue_df
 
 
-def assign_target_attributes(catalogue_df, src_id='dr3_source_id', conditions=None):
-    # TODO Needs to change to accomodate the added SKY targets
+def assign_target_attributes(catalogue_df,
+                             src_id='dr3_source_id',
+                             conditions=None):
+    """
+    Annotate catalogue rows with WEAVE target attributes (`targclass`, `targuse`,
+    `targprio`, `targname`, `targid`) based on flags and optional priority rules.
+    Currently this function limits itself to only creating targclass = "STAR" targets.
+    If necessary this will be changed in the future.
+
+    By default:
+      - `targclass` is 'STAR' for all, overridden to 'SKY' where `sourceFlag == -1`.
+      - `targuse` is 'T' (science), overridden to 'G' for guides (`sourceFlag == 9`)
+        and 'S' for sky (`sourceFlag == -1`).
+      - `targprio` is 1.0 globally, but can be overridden per-value using `conditions`.
+      - `targname` and `targid` are populated from the column named by `src_id`.
+
+    Args:
+        catalogue_df (pd.DataFrame): Input table that must include:
+            - `sourceFlag` (int): classification flag (e.g., 9 = guide, -1 = sky).
+            - the identifier column named by `src_id`.
+            - any columns referenced in `conditions` (if provided).
+        src_id (str, optional): Column used to fill `targname` and `targid`.
+            Defaults to 'dr3_source_id'.
+        conditions (dict[str, dict[Any, float]] | None, optional): Optional mapping to
+            assign custom priorities. Structure:
+            `{ column_name: { value: priority, ... }, ... }`.
+            For each `(column_name, value)`, rows where `catalogue_df[column_name] == value`
+            will receive `targprio = priority`.
+
+    Returns:
+        pd.DataFrame: The input DataFrame with added/updated columns:
+            - `targclass` ∈ {'STAR', 'SKY'}
+            - `targuse` ∈ {'T', 'G', 'S'}
+            - `targprio` (float)
+            - `targname`, `targid` (copied from `src_id`)
+
+    Notes:
+        - Priority assignments in `conditions` overwrite the default `targprio` (1.0)
+          and may overwrite one another if multiple rules match the same row; the last
+          matching rule applied wins due to iteration order.
+        - This function modifies a copy-on-write-aware DataFrame in place w.r.t. logical
+          assignment semantics; if you need to avoid mutating the original frame, pass
+          `catalogue_df.copy()`.
+
+    Raises:
+        KeyError: If `src_id` is not a column in `catalogue_df`, or if any column named
+          in `conditions` is missing.
+    """
+
     catalogue_df['targclass'] = 'STAR'
     catalogue_df.loc[catalogue_df['sourceFlag'] == -1, 'targclass'] = 'SKY'
 
     catalogue_df['targuse'] = 'T'
     catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'targuse'] = 'G'
     catalogue_df.loc[catalogue_df['sourceFlag'] == -1, 'targuse'] = 'S'
-
 
     # Default priority
     catalogue_df['targprio'] = 1.0
@@ -1621,7 +1678,7 @@ def assign_target_attributes(catalogue_df, src_id='dr3_source_id', conditions=No
 
 
 def fill_fits_template(catalogue_df, fits_template, header_dict=None,
-                       gaia_dr=2, batch_id=0, create_cnames=False):
+                       gaia_dr=3, batch_id=0, create_cnames=False):
     if gaia_dr == 3:
         plato_to_weave_dict = {'dr3_source_id': 'GAIA_ID',
                                'gaiaDR': 'GAIA_DR',
@@ -1719,7 +1776,7 @@ def fill_fits_template(catalogue_df, fits_template, header_dict=None,
     fits_frame = data_table.to_pandas()
     # print(fits_frame.columns)
     # print(catalogue_df.columns.tolist())
-   #for src_col, trg_col in plato_to_weave_dict.items():
+    # for src_col, trg_col in plato_to_weave_dict.items():
     #    fits_frame[trg_col] = catalogue_df[src_col]
 
     for col in fits_frame.columns:
@@ -1868,8 +1925,8 @@ def create_twilight_input_catalogue(catalogue_csv,
                                     create_cnames=False,
                                     priority_conditions=None,
                                     no_guide_stars=True,
-                                    WEAVE_standard_col_names=True
-                                    ):
+                                    WEAVE_standard_col_names=True):
+
     if gaia_dr == 3:
         ra_col = 'ra'
         de_col = 'dec'
@@ -1894,10 +1951,10 @@ def create_twilight_input_catalogue(catalogue_csv,
     catalogue_df = pd.read_csv(catalogue_csv).astype({src_id: str})
 
     # Define targsrvy, targcat, etc.
-    #catalogue_df['TARGSRVY'] = targsrvy
-    #catalogue_df['TARGCAT'] = targsrvy + '.fits'
-    #catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'TARGCAT'] = 'WG.fits'
-    #catalogue_df.loc[:, 'GAIA_DR'] = str(gaia_dr)
+    # catalogue_df['TARGSRVY'] = targsrvy
+    # catalogue_df['TARGCAT'] = targsrvy + '.fits'
+    # catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'TARGCAT'] = 'WG.fits'
+    # catalogue_df.loc[:, 'GAIA_DR'] = str(gaia_dr)
 
     # Create central target and guide stars CSVs:
     # This is done because there cannot be two fits catalogues for one
@@ -1961,47 +2018,65 @@ def create_plate_fits_file(infile,
                            plate='A',
                            hemisphere='N',
                            outpath='./',
-                           src_id_col='CNAME',            # column name in FITS table to match on
+                           src_id_col='CNAME',  # src id column name in FITS table to match on
                            coverage_targprog_col='TARGPROG'):
-
     """
-    Build a new FITS:
-      - Keep only rows in HDU[1] where `id_col` is present in coverage_df[id_col].
-      - Overwrite/define TARGPROG in HDU[1] from coverage_df[coverage_targprog_col],
-        matched by CNAME.
-      - Additionally, append rows from coverage_df where sourceFlag == -1 and CNAME is
-        missing/blank to the end of the table (these rows are not matched by CNAME).
-      - Preserve Primary HDU and all other extensions unchanged.
-      - Write with checksums.
+    Create a plate-specific FITS file by filtering and updating the target table,
+    while preserving the primary HDU and all other extensions.
 
-    Returns
-    -------
-    progtemp_str : str
-        The PROGTEMP value from non-sky rows (first non-empty unique).
-    obstemp_str : str
-        The OBSTEMP value from non-sky rows (first non-empty unique).
+    The function:
+      - keeps only rows in extension 1 where `src_id_col` is present in
+        `coverage_df[src_id_col]`,
+      - overwrites (or creates) `TARGPROG` in extension 1 using
+        `coverage_df[coverage_targprog_col]`, matched by `src_id_col`,
+      - appends “sky” rows from `coverage_df` where `sourceFlag == -1` and the
+        `src_id_col` value is blank (these are not matched by ID),
+      - writes the result as `<outpath>/<infile_base>_<plate>_<hemisphere>.fits`
+        with FITS checksums,
+      - and returns the first non-empty unique `PROGTEMP` and `OBSTEMP` strings
+        found among non-sky rows.
+
+    If `plate` is not None, helper CSVs for guide stars and central targets are also
+    written alongside the FITS using `coverage_df`.
+
+    Args:
+        infile (str): Path to the input FITS file. The primary HDU and all
+            non-target-table extensions are copied unchanged.
+        coverage_df (pd.DataFrame): Coverage catalogue used to filter and annotate the
+            target table. Must include `src_id_col`, `coverage_targprog_col`, and (for
+            sky rows) `sourceFlag`.
+        plate (str, optional): Plate identifier ('A' or 'B'). If not None, CSV helper
+            files for guides/central targets are written. Defaults to 'A'.
+        hemisphere (str, optional): Hemisphere code ('N' or 'S') passed to the helper
+            CSV writers. Defaults to 'N'.
+        outpath (str, optional): Output directory for the new FITS and helper CSVs.
+            Defaults to './'.
+        src_id_col (str, optional): Column name used to match rows (e.g. 'CNAME').
+            Defaults to 'CNAME'.
+        coverage_targprog_col (str, optional): Column in `coverage_df` containing the
+            desired `TARGPROG` values. Defaults to 'TARGPROG'.
+
+    Returns:
+        tuple[str, str]:
+            - `progtemp_str`: First non-empty unique `PROGTEMP` value among non-sky rows.
+            - `obstemp_str`: First non-empty unique `OBSTEMP` value among non-sky rows.
+
+    Notes:
+        - Matching is performed on a whitespace-stripped string version of `src_id_col`.
+        - When appending sky rows, the function conforms their columns and dtypes to the
+          FITS table schema (including byte/unicode handling).
+        - Only extension 1 (the main target table) is filtered/updated; all other HDUs
+          are preserved as-is.
+        - The output filename is derived from `infile` (base name) plus
+          `_<plate>_<hemisphere>.fits`.
+
+    Raises:
+        TypeError: If `coverage_df` is not a pandas DataFrame.
+        KeyError: If required columns (`src_id_col`, `coverage_targprog_col`) are missing
+            from `coverage_df`, or if `src_id_col` is missing from the FITS table.
     """
-    import numpy as np
-    import pandas as pd
-    from astropy.io import fits
-    from astropy.table import Table, vstack
 
-    infile_name = infile.split("/")[-1].split(".")[0]
-
-    if plate is not None:
-        create_guide_stars_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
-                               de_col='GAIA_DEC', src_id=src_id_col, hemisphere=hemisphere,
-                               output_dir=outpath)
-        create_central_target_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
-                                  de_col='GAIA_DEC', mag_col='GAIA_MAG_G',
-                                  hemisphere=hemisphere,
-                                  src_id=src_id_col, output_dir=outpath)
-
-    if not isinstance(coverage_df, pd.DataFrame):
-        raise TypeError("coverage_df must be a pandas DataFrame")
-
-
-    # --- Helpers ---
+    # Helper functions
     def _series_to_clean_str(s):
         return (s.astype('string')
                  .str.strip()
@@ -2057,7 +2132,23 @@ def create_plate_fits_file(infile,
         uniq = np.unique(vals[mask])
         return uniq[0] if len(uniq) > 0 else ""
 
-    # --- Normalise coverage data used for matching/mapping ---
+    # ############################ Main Logic ############################
+
+    infile_name = infile.split("/")[-1].split(".")[0]
+
+    if plate is not None:
+        create_guide_stars_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
+                               de_col='GAIA_DEC', src_id=src_id_col, hemisphere=hemisphere,
+                               output_dir=outpath)
+        create_central_target_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
+                                  de_col='GAIA_DEC', mag_col='GAIA_MAG_G',
+                                  hemisphere=hemisphere,
+                                  src_id=src_id_col, output_dir=outpath)
+
+    if not isinstance(coverage_df, pd.DataFrame):
+        raise TypeError("coverage_df must be a pandas DataFrame")
+
+    # Normalise coverage data used for matching/mapping
     cov_cnames = _series_to_clean_str(coverage_df[src_id_col])
     cov_targprog = _series_to_clean_str(coverage_df[coverage_targprog_col])
 
@@ -2072,10 +2163,8 @@ def create_plate_fits_file(infile,
     ext = 1
 
     with fits.open(infile, mode='readonly', memmap=False) as hdul:
-        # Copy Primary HDU exactly
         new_hdul = fits.HDUList([hdul[0].copy()])
 
-        # Loop through all extensions
         for i in range(1, len(hdul)):
             if i != ext:
                 new_hdul.append(hdul[i].copy())
@@ -2087,22 +2176,20 @@ def create_plate_fits_file(infile,
                 new_hdul.append(tbl_hdu.copy())
                 continue
 
-            # Work with an Astropy Table
             tbl = Table(data)
 
-            # Robust CNAME normalisation (bytes vs unicode)
+            # CNAME column to bytes
             cname_col_data = tbl[src_id_col]
-            if cname_col_data.dtype.kind == 'S':  # bytes
+            if cname_col_data.dtype.kind == 'S':
                 norm_cname = np.char.strip(np.char.decode(cname_col_data,
                                                           'utf-8', errors='ignore'))
             else:
                 norm_cname = np.char.strip(cname_col_data.astype(str))
 
-            # Filter to coverage CNAMEs (original behaviour)
             mask_keep = np.isin(norm_cname, list(keep_set))
             tbl_filtered = tbl[mask_keep]
 
-            # If there are kept rows, map/overwrite TARGPROG from coverage_df (original behaviour)
+            # If there are kept rows, map/overwrite TARGPROG from coverage_df
             if len(tbl_filtered) > 0:
                 if tbl_filtered[src_id_col].dtype.kind == 'S':
                     norm_cname_filtered = np.char.strip(
@@ -2116,14 +2203,18 @@ def create_plate_fits_file(infile,
                     dtype=object
                 )
 
-                # Ensure/overwrite TARGPROG in the FITS table
+                # Overwrite TARGPROG in the FITS table.
+                # (essential for correct guide fibre allocation,
+                # original input FITS not changed!)
                 if 'TARGPROG' not in tbl_filtered.colnames:
-                    has_bytes = any(tbl_filtered[c].dtype.kind == 'S' for c in tbl_filtered.colnames)
+                    has_bytes = any(tbl_filtered[c].dtype.kind == 'S'
+                                    for c in tbl_filtered.colnames)
                     if has_bytes:
                         width = max(16, int(mapped_targprog.astype(str).map(len).max()
                                             if len(mapped_targprog) else 16))
                         dtype = f'S{width}'
-                        tbl_filtered['TARGPROG'] = _to_bytes_array(mapped_targprog, np.dtype(dtype))
+                        tbl_filtered['TARGPROG'] = _to_bytes_array(mapped_targprog,
+                                                                   np.dtype(dtype))
                     else:
                         tbl_filtered['TARGPROG'] = mapped_targprog.astype(str)
                 else:
@@ -2133,7 +2224,7 @@ def create_plate_fits_file(infile,
                     else:
                         tbl_filtered['TARGPROG'] = mapped_targprog.astype(str)
 
-            # append sky rows (sourceFlag == -1, blank CNAME) at the end
+            # Append sky rows (sourceFlag == -1, blank CNAME) at the end
             if len(append_sky_df) > 0:
                 schema_ref = tbl_filtered if len(tbl_filtered) > 0 else tbl
                 names = list(schema_ref.colnames)
@@ -2152,14 +2243,20 @@ def create_plate_fits_file(infile,
                         src_vals = pd.Series([np.nan] * n_new)
 
                     if len(src_vals) != n_new:
-                        src_vals = pd.Series(list(src_vals) + [np.nan] * (n_new - len(src_vals)))[:n_new]
+                        src_vals = pd.Series(list(src_vals)
+                                             + [np.nan] * (n_new - len(src_vals)))[:n_new]
+
                     col_data[c] = _coerce_to_dtype(src_vals, dt)
 
                 sky_tbl = Table(col_data)
 
-                tbl_out = vstack([tbl_filtered, sky_tbl],
-                                 join_type='exact',
-                                 metadata_conflicts='silent') if len(tbl_filtered) > 0 else sky_tbl
+                if len(tbl_filtered) > 0:
+                    tbl_out = vstack([tbl_filtered, sky_tbl],
+                                     join_type='exact',
+                                     metadata_conflicts='silent')
+                else:
+                    tbl_out = sky_tbl
+
             else:
                 tbl_out = tbl_filtered
 
@@ -2181,7 +2278,6 @@ def create_plate_fits_file(infile,
     obstemp_str = _unique_nonempty_from_table(out_tbl, 'OBSTEMP')
 
     return progtemp_str, obstemp_str
-
 
 
 if __name__ == '__main__':

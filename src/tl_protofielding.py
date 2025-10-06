@@ -1959,7 +1959,6 @@ if __name__ == '__main__':
                                                src_id_col='CNAME',
                                                outpath='./')
 
-
     # Initialise TLDriverCat
     tl_driver = TLDriverCat(filename=f'./WS2025XX-XXX_{plate}_{hemisphere}.fits',
                             guide_star_csv=f'./guide_stars_{plate}_{hemisphere}.csv',
@@ -1972,7 +1971,6 @@ if __name__ == '__main__':
     central_target_df = pd.read_csv(target_csv_path)
     print(central_target_df.shape[0], 'central guide stars found!')
     field_batch_ids = central_target_df['batchId'].unique()
-
 
     # Run creation of CONFIGURE xmls at './output_data/xmls'
     for batch_id in field_batch_ids:

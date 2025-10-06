@@ -1677,342 +1677,6 @@ def assign_target_attributes(catalogue_df,
     return catalogue_df
 
 
-def fill_fits_template(catalogue_df, fits_template, header_dict=None,
-                       gaia_dr=3, batch_id=0, create_cnames=False):
-    if gaia_dr == 3:
-        plato_to_weave_dict = {'dr3_source_id': 'GAIA_ID',
-                               'gaiaDR': 'GAIA_DR',
-                               'ra': 'GAIA_RA',
-                               'dec': 'GAIA_DEC',
-                               'parallax': 'GAIA_PARAL',
-                               'parallax_error': 'GAIA_PARAL_ERR',
-                               'pmra': 'GAIA_PMRA',
-                               'pmra_error': 'GAIA_PMRA_ERR',
-                               'pmdec': 'GAIA_PMDEC',
-                               'pmdec_error': 'GAIA_PMDEC_ERR',
-                               'ref_epoch': 'GAIA_EPOCH',
-                               'phot_g_mean_mag': 'GAIA_MAG_G',
-                               'phot_g_mean_mag_error': 'GAIA_MAG_G_ERR',
-                               'phot_bp_mean_mag': 'GAIA_MAG_BP',
-                               'phot_bp_mean_mag_error': 'GAIA_MAG_BP_ERR',
-                               'phot_rp_mean_mag': 'GAIA_MAG_RP',
-                               'phot_rp_mean_mag_error': 'GAIA_MAG_RP_ERR',
-                               'targprog': 'TARGPROG',
-                               'obstemp': 'OBSTEMP',
-                               'progtemp': 'PROGTEMP',
-                               'targclass': 'TARGCLASS',
-                               'targuse': 'TARGUSE',
-                               'targprio': 'TARGPRIO',
-                               'targname': 'TARGNAME',
-                               'targid': 'TARGID',
-                               'targcat': 'TARGCAT',
-                               'targsrvy': 'TARGSRVY',
-                               'M_H': 'FEHCAT_FEH',
-                               'M_H_ERR': 'FEHCAT_FEH_ERR',
-                               'TEFF': 'TEFFCAT_TEFF',
-                               'TEFF_ERR': 'TEFFCAT_TEFF_ERR',
-                               'LOGG': 'LOGGCAT_LOGG',
-                               'LOGG_ERR': 'LOGGCAT_LOGG_ERR',
-                               'l': 'GAIA_GAL_LONG',
-                               'b': 'GAIA_GAL_LAT'
-                               }
-
-    elif gaia_dr == 2:
-        plato_to_weave_dict = {'dr3_source_id': 'GAIA_ID',
-                               'gaiaDR': 'GAIA_DR',
-                               'RAdeg': 'GAIA_RA',
-                               'DEdeg': 'GAIA_DEC',
-                               'Plx': 'GAIA_PARAL',
-                               'ePlx': 'GAIA_PARAL_ERR',
-                               'pmRA': 'GAIA_PMRA',
-                               'epmRA': 'GAIA_PMRA_ERR',
-                               'pmDE': 'GAIA_PMDEC',
-                               'epmDE': 'GAIA_PMDEC_ERR',
-                               'Epoch': 'GAIA_EPOCH',
-                               'Gmag': 'GAIA_MAG_G',
-                               'eGmag': 'GAIA_MAG_G_ERR',
-                               'BPmag': 'GAIA_MAG_BP',
-                               'eBPmag': 'GAIA_MAG_BP_ERR',
-                               'RPmag': 'GAIA_MAG_RP',
-                               'eRPmag': 'GAIA_MAG_RP_ERR',
-                               'targprog': 'TARGPROG',
-                               'obstemp': 'OBSTEMP',
-                               'progtemp': 'PROGTEMP',
-                               'targclass': 'TARGCLASS',
-                               'targuse': 'TARGUSE',
-                               'targprio': 'TARGPRIO',
-                               'targname': 'TARGNAME',
-                               'targid': 'TARGID',
-                               'targcat': 'TARGCAT',
-                               'targsrvy': 'TARGSRVY'
-                               }
-
-    def _update_header(header, header_dict):
-        for key, value in header_dict.items():
-            header[key] = value
-        return header
-
-    catalogue_df = catalogue_df.copy()
-    # print(catalogue_df.columns)
-
-    with fits.open(fits_template, mode='readonly') as hdu:
-        hdu = fits.open(fits_template)
-        if header_dict is not None:
-            header_0 = hdu[0].header
-            header_0 = _update_header(header_0, header_dict)
-            hdu[0] = fits.PrimaryHDU(header=header_0)
-            hdu[0].header['EXTEND'] = True
-        else:
-            header_0 = hdu[0].header.copy()
-
-        header_1 = hdu[1].header
-        columns = hdu[1].columns
-        data = hdu[1].data
-        data_table = Table(data)
-
-    new_prim_hdu = fits.PrimaryHDU(header=header_0)
-    # print(repr(header_1))
-
-    fits_frame = data_table.to_pandas()
-    # print(fits_frame.columns)
-    # print(catalogue_df.columns.tolist())
-    # for src_col, trg_col in plato_to_weave_dict.items():
-    #    fits_frame[trg_col] = catalogue_df[src_col]
-
-    for col in fits_frame.columns:
-        fits_frame[col] = catalogue_df[col]
-    # print(fits_frame['GAIA_MAG_G'])
-    # fits_frame.loc[:, 'IFU_DITHER'] = 0
-    # fits_frame.loc[:, 'HEALPIX'] = -1
-
-    col_idx = 1
-    for col in columns:
-        col_name = col.name
-        col_format = col.format
-
-        tnull_key = f'TNULL{col_idx}'
-        tnull_val = header_1.get(tnull_key, None)
-
-        # Convert FITS format to NumPy dtype
-        if col_format.endswith('A'):  # ASCII String
-            dtype = f'U{int(col_format[:-1])}'
-        elif col_format == 'E':  # 4-byte Float
-            dtype = np.float32
-        elif col_format == 'D':  # 8-byte Float (double precision)
-            dtype = np.float64
-        elif col_format == 'I':  # 2-byte Integer
-            dtype = np.int16
-        elif col_format == 'J':  # 4-byte Integer
-            dtype = np.int32
-        elif col_format == 'K':  # 8-byte Integer
-            dtype = np.int64
-        else:
-            dtype = None
-
-        # Populate with actual data
-        if col_name in fits_frame.columns:
-            # print(col_name)
-            # print(col_format)
-            # print(tnull_key)
-            # print(tnull_val)
-            # print(dtype)
-            if tnull_val is not None:
-                fits_frame[col_name] = tnull_val
-            else:
-                fits_frame[col_name] = fits_frame[col_name].astype(dtype)
-        else:
-            logging.warning(f'Column {col_name} not found in catalogue.')
-        col_idx += 1
-
-    fits_frame['FEHCAT_ID'] = catalogue_df['FEHCAT_ID']
-    fits_frame['LOGGCAT_ID'] = catalogue_df['LOGGCAT_ID']
-    fits_frame['TEFFCAT_ID'] = catalogue_df['TEFFCAT_ID']
-
-    fits_frame[['FEHCAT_ID',
-                'LOGGCAT_ID',
-                'TEFFCAT_ID']] = fits_frame[['FEHCAT_ID',
-                                             'LOGGCAT_ID',
-                                             'TEFFCAT_ID']].replace({'nan': ''})
-
-    filled_table = Table.from_pandas(fits_frame)
-
-    # Ensure "APS_FLAG" is correctly formatted as ASCII with length 48
-    if 'APS_FLAG' in filled_table.colnames:
-        filled_table['APS_FLAG'] = np.array(filled_table['APS_FLAG'], dtype='S48')
-
-    filled_table['APS_FLAG'] = ''  # default='', FGK-STAR-Flag='1000111000001000000001100100'
-
-    if 'LOGGCAT' or 'FEHCAT' or 'TEFFCAT' in filled_table.colnames:
-        filled_table['LOGGCAT'] = np.array(filled_table['LOGGCAT'], dtype='S20')
-        filled_table['FEHCAT'] = np.array(filled_table['FEHCAT'], dtype='S20')
-        filled_table['TEFFCAT'] = np.array(filled_table['TEFFCAT'], dtype='S20')
-
-    filled_table['FEHCAT'] = catalogue_df['FEHCAT']
-    filled_table['LOGGCAT'] = catalogue_df['LOGGCAT']
-    filled_table['TEFFCAT'] = catalogue_df['TEFFCAT']
-
-    # Write cnames into CNAME column. This is for TESTING ONLY!
-    if create_cnames:
-        from cname_tools import get_cname
-
-        logging.warning('CNAMEs are being created manually instead of by WASP. '
-                        'This is for TESTING ONLY!')
-
-        filled_table['CNAME'] = filled_table['CNAME'].astype('S20')
-        for i in range(len(filled_table)):
-            ra = filled_table['GAIA_RA'][i]
-            dec = filled_table['GAIA_DEC'][i]
-            cname = get_cname(float(ra), float(dec))
-            filled_table['CNAME'][i] = cname
-    else:
-        filled_table['CNAME'] = ''
-    filled_table['IFU_SPAXEL'] = ''
-    filled_table['APS_TEMPL_LIB'] = ''
-    filled_table['APS_IFU_TSSL_TYPE'] = ''
-    filled_table['APS_IFU_SRC_ID'] = ''
-    filled_table['FEHCAT_DR'] = catalogue_df['FEHCAT_DR']
-    filled_table['LOGGCAT_DR'] = catalogue_df['LOGGCAT_DR']
-    filled_table['TEFFCAT_DR'] = catalogue_df['TEFFCAT_DR']
-
-    # print(filled_table[['LOGGCAT', 'FEHCAT_ID', 'LOGGCAT_ID', 'TEFFCAT_ID']])
-
-    if batch_id is not None:
-        header_1['EXTNAME'] = f'WTLsemester-{str(batch_id).zfill(3)}'
-
-    new_sec_hdu = fits.BinTableHDU.from_columns(columns, nrows=len(filled_table))
-
-    for col_name in filled_table.colnames:
-        if col_name in new_sec_hdu.columns.names:
-            new_sec_hdu.data[col_name] = filled_table[col_name]
-
-    new_sec_hdu.header.clear()  # Remove auto-generated header
-    for key, value, comment in header_1.cards:
-        new_sec_hdu.header.append((key, value, comment), end=True)
-
-    new_hdu_list = fits.HDUList([new_prim_hdu, new_sec_hdu])
-
-    # print('-----------------------------------')
-    # print(repr(new_hdu.header))
-    # print(repr(hdu[1].header))
-    # old_keys = set(header_1.keys())
-    # new_keys = set(hdu[1].header.keys())
-
-    # removed_keys = old_keys - new_keys
-    # added_keys = new_keys - old_keys
-
-    # print("Removed keys:", removed_keys)
-    # print("Added keys:", added_keys)
-    # print(new_hdu_list.info())
-    # print(new_hdu_list[1].columns)
-    # print(repr(new_hdu_list[1].header))
-
-    return new_hdu_list
-
-
-def create_twilight_input_catalogue(catalogue_csv,
-                                    fits_template,
-                                    output_dir,
-                                    targsrvy='W',
-                                    hemisphere='N',
-                                    header_dict=None,
-                                    plate=None,
-                                    gaia_dr=3,
-                                    obstemp='AAAAA',
-                                    progtemp=11111,
-                                    trimester='2024B2',
-                                    INGnr='001',
-                                    observation_type=None,
-                                    create_cnames=False,
-                                    priority_conditions=None,
-                                    no_guide_stars=True,
-                                    WEAVE_standard_col_names=True):
-
-    if gaia_dr == 3:
-        ra_col = 'ra'
-        de_col = 'dec'
-        mag_col = 'phot_g_mean_mag'
-        src_id = 'dr3_source_id'
-        ra_col = 'GAIA_RA'
-        de_col = 'GAIA_DEC'
-        mag_col = 'GAIA_MAG_G'
-        src_id = 'GAIA_ID'
-
-    elif gaia_dr == 2:
-        ra_col = 'RAdeg'
-        de_col = 'DEdeg'
-        mag_col = 'Gmag'
-        src_id = 'sourceId'
-
-    if observation_type is not None:
-        catalogue_name = f'{targsrvy}_' + f'{observation_type}' + f'{trimester}'
-    else:
-        catalogue_name = f'{targsrvy}'
-
-    catalogue_df = pd.read_csv(catalogue_csv).astype({src_id: str})
-
-    # Define targsrvy, targcat, etc.
-    # catalogue_df['TARGSRVY'] = targsrvy
-    # catalogue_df['TARGCAT'] = targsrvy + '.fits'
-    # catalogue_df.loc[catalogue_df['sourceFlag'] == 9, 'TARGCAT'] = 'WG.fits'
-    # catalogue_df.loc[:, 'GAIA_DR'] = str(gaia_dr)
-
-    # Create central target and guide stars CSVs:
-    # This is done because there cannot be two fits catalogues for one
-    # TARGSRVY. Because of the different fields (field_ids) for plate A and B
-    # this creates separate fits files for each plate.
-    # If plate is None the master fits file is created. It contains all
-    # science targets thgprogat are in the plate A and B catalogues. Duplicates are removed.
-    # In the future handling via a combined TARGPROG might be necessary.
-
-    if plate is not None:
-        create_central_target_csv(catalogue_csv, plate=plate, ra_col=ra_col,
-                                  de_col=de_col, mag_col=mag_col, hemisphere=hemisphere,
-                                  src_id=src_id, output_dir=output_dir)
-        create_guide_stars_csv(catalogue_csv, plate=plate, ra_col=ra_col,
-                               de_col=de_col, src_id=src_id, hemisphere=hemisphere,
-                               output_dir=output_dir)
-
-    # Filter out Guide stars
-    if no_guide_stars:
-        catalogue_df = catalogue_df[(~catalogue_df['sourceFlag'].isin([9])) &
-                                    (~catalogue_df['guide'].isin([1, 2]))]
-
-    catalogue_df = assign_obstemp(catalogue_df, obstemp=obstemp)
-    catalogue_df = assign_progtemp(catalogue_df, progtemp=progtemp)
-    catalogue_df['targprog'] = ''
-
-    if plate is not None:
-        catalogue_df = assign_targprog(catalogue_df)
-    catalogue_df = assign_target_attributes(catalogue_df, src_id=src_id,
-                                            conditions=priority_conditions)
-    # print(catalogue_df.columns)
-    if create_cnames:
-        cname_status = True
-    else:
-        cname_status = False
-
-    if header_dict is not None:
-        hdu = fill_fits_template(catalogue_df, fits_template,
-                                 gaia_dr=gaia_dr, header_dict=header_dict,
-                                 batch_id=None, create_cnames=cname_status)
-    else:
-        hdu = fill_fits_template(catalogue_df, fits_template,
-                                 gaia_dr=gaia_dr, batch_id=None,
-                                 create_cnames=cname_status)
-    # print(Table(hdu[1].data)['TARGSRVY'])
-    if plate is not None:
-        if not cname_status:
-            hdu.writeto(output_dir + catalogue_name +
-                        f'_{plate}_{hemisphere}' + '_noCnames' + '.fits', overwrite=True,
-                        checksum=True)
-        else:
-            hdu.writeto(output_dir + catalogue_name +
-                        f'_{plate}_{hemisphere}' + '.fits', overwrite=True,
-                        checksum=True)
-    else:
-        hdu.writeto(output_dir + catalogue_name + '.fits', overwrite=True, checksum=True)
-
-
 def create_plate_fits_file(infile,
                            coverage_df,
                            plate='A',
@@ -2283,36 +1947,47 @@ def create_plate_fits_file(infile,
 if __name__ == '__main__':
 
     # Example usecase:
-    # Set progtemp, obstemp and position angle of the plate.
-    # North of Zenith = north_pa
-    # South of Zenith = south_pa
 
-    progtemp = '29991'
-    obstemp = 'FEEDG'
-    north_pa = '180'
-    south_pa = '0'
+    plate = 'A'
+    hemisphere = 'N'
 
     # Create fits input catalogue, central_target_list.csv and guide_stars.csv
-    create_twilight_input_catalogue('./input_data/coverage.csv',
-                                    './input_data/BASE_CatalogueTemplate.fits',
-                                    output_dir='./output_data/',
-                                    trimester='2024B2',
-                                    observation_type='S', progtemp=progtemp,
-                                    obstemp=obstemp)
+    progtemp, obstemp = create_plate_fits_file(infile='./WS2025XX-XXX.fits',
+                                               coverage_df='./tl_coverage_plate_A_N.csv',
+                                               plate=plate,
+                                               hemisphere=hemisphere,
+                                               src_id_col='CNAME',
+                                               outpath='./')
+
 
     # Initialise TLDriverCat
-    tl_test = TLDriverCat('./output_data/WS2024B2-001.fits', targcat='WS2024B2-001',
-                          progtemp_file=None)
+    tl_driver = TLDriverCat(filename=f'./WS2025XX-XXX_{plate}_{hemisphere}.fits',
+                            guide_star_csv=f'./guide_stars_{plate}_{hemisphere}.csv',
+                            expcal_json='./resources/expcal.json')
 
     # Set paths for central_target_list.csv
-    target_csv_path = './output_data/central_target_list.csv'
+    target_csv_path = f'./central_target_list_{plate}_{hemisphere}.csv'
 
     # Read in as pandas dataframe to get unique field batch ids:
     central_target_df = pd.read_csv(target_csv_path)
+    print(central_target_df.shape[0], 'central guide stars found!')
     field_batch_ids = central_target_df['batchId'].unique()
+
 
     # Run creation of CONFIGURE xmls at './output_data/xmls'
     for batch_id in field_batch_ids:
-        tl_test.process_tl_ob(batch_id, target_csv_path,
-                              progtemp=progtemp, obstemp=obstemp,
-                              plate='PLATE_A', pa=north_pa)
+        tl_driver.process_tl_ob(batch_id, target_csv_path,
+                                h_suffix=hemisphere,
+                                progtemp=progtemp,
+                                obstemp=obstemp,
+                                plate=f'PLATE_{plate}',
+                                calib_stars=False,
+                                output_dir=f'./xmls/plate_{plate}/{hemisphere}/',
+                                guide_mag_lim=16.,
+                                calib_mag_lim=20.0,
+                                min_guide_cut=0.1,
+                                max_guide_cut=0.98,
+                                suffix=batch_id,
+                                verbose=False,
+                                ob_class='science',
+                                field_name='DEMO')

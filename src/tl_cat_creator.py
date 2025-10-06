@@ -1,10 +1,259 @@
+import os
+import logging
+
 import pandas as pd
 import numpy as np
-import os
-from astropy.io import fits
+
 import healpy as hp
+from astropy.io import fits
 from astropy.table import Table
-from workflow.utils.get_resources import get_guide_cat
+
+
+def fill_wasp_fits_template(catalogue_path,
+                            fits_template_path,
+                            output_path='./',
+                            mapping={},
+                            header_updates=None,
+                            defaults=None,
+                            allow_passthrough_same_name=True,
+                            extname=None,
+                            fill_missing_with_tnull=True,
+                            chunk_read_kwargs=None,
+                            dataframe_postprocess=None,
+                            passthrough_static=None,
+                            checksum=True,
+                            overwrite=False):
+    """
+    Write a WASP-compliant FITS catalogue from a user-provided table (CSV or Parquet)
+    by mapping its columns onto a survey-specific WASP Catalogue Template. Columns
+    with identical names are auto-mapped; differing names must be provided via
+    `mapping`. Template columns missing from the source can be filled from `defaults`
+    or, when available, from the template's per-column TNULLn values (recommended for
+    strict WASP compatibility).
+
+    Args:
+        catalogue_path (str): Path to the input catalogue (.csv or .parquet).
+        fits_template_path (str): Path to the WASP FITS template
+                                  (Primary HDU + binary table in HDU 1).
+        output_path (str): Destination path (including filename) for the output FITS.
+        mapping (dict): Mapping from source columns to template columns.
+            - Basic: `{"dr3_source_id": "GAIA_ID", "ra": "GAIA_RA", ...}
+            - Advanced (with transform): {"gmag": ("GAIA_MAG_G", lambda s: s.astype(float))}
+        header_updates (dict, optional): Key-value pairs merged into the
+                                         primary header (HDU 0).
+        defaults (dict, optional): Fallback values for template columns when source data
+            or a mapping is not provided.
+        allow_passthrough_same_name (bool, optional): If True, copy source columns whose
+            names match the template exactly. Defaults to True.
+        extname (str, optional): If provided, set as `EXTNAME`
+                                 on HDU 1 (e.g., "WS2025XX-001").
+        fill_missing_with_tnull (bool, optional): If True, fill missing values using the
+            template column's TNULLn where defined. Defaults to True.
+        chunk_read_kwargs (dict, optional): Extra keyword arguments forwarded to `pd.read_csv`
+            (useful for large CSVs and chunked reads).
+        dataframe_postprocess (callable, optional): Hook applied after loading, before mapping:
+            `df = dataframe_postprocess(df)`.
+        passthrough_static (dict, optional): Constant values to set on specific
+                                             template columns (e.g., {"APS_FLAG": ""}).
+        checksum (bool, optional): If True, write FITS with checksums.
+                                   Defaults to True.
+        overwrite (bool, optional): If True, allow overwriting an existing `output_path`.
+                                    Defaults to False.
+
+    Returns:
+        None: The function writes the FITS file to output_path.
+
+    Notes:
+        - Auto-mapping applies only where source and template column names are identical;
+          all other mappings must be specified in mapping.
+        - When both defaults and TNULLn exist, the fill order is typically: mapped data
+          → defaults → TNULLn (if fill_missing_with_tnull=True).
+        - Use `dataframe_postprocess for last-mile cleaning (dtype fixes, unit conversions,
+          renaming before mapping, etc.).
+    """
+
+    # Safety: do not overwrite the template by mistake
+    if os.path.abspath(output_path) == os.path.abspath(fits_template_path):
+        raise ValueError("Output path must not be the same as the FITS template path.")
+
+    # Load catalogue
+    ext_in = os.path.splitext(catalogue_path)[1].lower()
+    if ext_in in (".parquet", ".pq"):
+        df = pd.read_parquet(catalogue_path)
+    elif ext_in in (".csv", ".txt"):
+        if chunk_read_kwargs:
+            chunks = pd.read_csv(catalogue_path, **chunk_read_kwargs)
+            if hasattr(chunks, "__iter__"):
+                df = pd.concat(chunks, ignore_index=True)
+            else:
+                df = chunks
+        else:
+            df = pd.read_csv(catalogue_path)
+    else:
+        raise ValueError(f"Unsupported catalogue extension: {ext_in}")
+
+    if dataframe_postprocess is not None:
+        df = dataframe_postprocess(df)
+
+    # Open FITS template HDU
+    with fits.open(fits_template_path, mode="readonly") as hdul:
+        prim_hdr = hdul[0].header.copy()
+        tab_hdr = hdul[1].header.copy()
+
+        # Detach columns from file: rebuild ColDefs from name/format only
+        tmpl_cols = fits.ColDefs([
+            fits.Column(name=c.name, format=c.format)
+            for c in hdul[1].columns
+        ])
+        tmpl_col_names = list(tmpl_cols.names)
+
+    # Primary header updates (on copy)
+    if header_updates:
+        for k, v in header_updates.items():
+            prim_hdr[k] = v
+    prim_hdr["EXTEND"] = True
+
+    defaults = defaults.copy() if defaults else {}
+    passthrough_static = passthrough_static.copy() if passthrough_static else {}
+
+    # Build the output data frame (template columns only, in order)
+    out_df = pd.DataFrame(index=np.arange(len(df)), columns=tmpl_col_names, dtype="object")
+
+    def _fits_tform_to_dtype(tform):
+        if tform is None:
+            return (None, None)
+        tform = tform.strip().upper()
+        if tform.endswith("A"):
+            try:
+                n = int(tform[:-1])
+            except ValueError:
+                n = None
+            return (np.bytes_, n)
+        return {
+            "E": (np.float32, None),
+            "D": (np.float64, None),
+            "I": (np.int16,  None),
+            "J": (np.int32,  None),
+            "K": (np.int64,  None),
+        }.get(tform, (None, None))
+
+    # Normalize mapping: target -> (source, transform_or_None)
+    normalized_map = {}
+    for src, tgt in mapping.items():
+        if isinstance(tgt, tuple) and len(tgt) == 2:
+            target, transform = tgt
+        else:
+            target, transform = tgt, None
+        normalized_map[target] = (src, transform)
+
+    # Fill out_df following priority:
+    # 1) explicit mapping, 2) passthrough same-name, 3) static passthrough 4) defaults
+    for tgt_col in tmpl_col_names:
+        filled = False
+
+        if tgt_col in normalized_map:
+            src_col, transform = normalized_map[tgt_col]
+            if src_col in df.columns:
+                series = df[src_col]
+                if transform is not None:
+                    series = transform(series)
+                out_df[tgt_col] = series
+                filled = True
+            else:
+                logging.warning(f"Source column '{src_col}' for target ' "
+                                "{tgt_col}' not found in catalogue.")
+
+        if not filled and allow_passthrough_same_name and tgt_col in df.columns:
+            out_df[tgt_col] = df[tgt_col]
+            filled = True
+
+        if not filled and tgt_col in passthrough_static:
+            out_df[tgt_col] = passthrough_static[tgt_col]
+            filled = True
+
+        if not filled and tgt_col in defaults:
+            out_df[tgt_col] = defaults[tgt_col]
+
+    # Enforce template types, TNULLs, and ASCII
+    prim_hdu = fits.PrimaryHDU(header=prim_hdr)
+    bin_hdu = fits.BinTableHDU.from_columns(tmpl_cols, nrows=len(out_df))
+
+    if extname:
+        if "EXTNAME" in bin_hdu.header:
+            del bin_hdu.header["EXTNAME"]
+        bin_hdu.header["EXTNAME"] = extname
+
+    # We need the *template* table header (tab_hdr) for TNULLn, TTYPEn, etc.
+    for idx, col in enumerate(tmpl_cols, start=1):
+        tgt = col.name
+        tform = col.format
+        np_dtype, str_len = _fits_tform_to_dtype(tform)
+        tnull_key = f"TNULL{idx}"
+        tnull_val = tab_hdr.get(tnull_key, None) if fill_missing_with_tnull else None
+
+        if tgt not in out_df.columns:
+            logging.warning(f"Target FITS column '{tgt}' "
+                            "missing in output frame; filling with defaults/TNULL.")
+            if np_dtype is np.bytes_:
+                bin_hdu.data[tgt] = np.array(["" for _ in range(len(out_df))],
+                                             dtype=f"S{str_len if str_len else 1}")
+            else:
+                if tnull_val is not None:
+                    bin_hdu.data[tgt] = np.array([tnull_val] * len(out_df))
+                else:
+                    fill = 0
+                    if np_dtype in (np.float32, np.float64):
+                        fill = np.nan
+                    bin_hdu.data[tgt] = np.array([fill] * len(out_df))
+            continue
+
+        series = out_df[tgt]
+
+        # Fixed-width ASCII strings
+        if np_dtype is np.bytes_:
+            ser = series.fillna("").astype(str).values.astype(f"S{str_len if str_len else 1}")
+            bin_hdu.data[tgt] = ser
+        else:
+            # Numerics
+            arr = series.values
+            if tnull_val is not None:
+                mask = pd.isna(arr)
+                if mask.any():
+                    if np_dtype in (np.int16, np.int32, np.int64):
+                        tmp = np.array(arr, dtype="object")
+                        tmp[mask] = tnull_val
+                        try:
+                            arr = tmp.astype(np_dtype)
+                        except Exception:
+                            arr = np.array([tnull_val if pd.isna(x) else x for x in series],
+                                           dtype=np.int64)
+                    else:
+                        arr = arr.astype(np_dtype, copy=False)
+                else:
+                    arr = arr.astype(np_dtype, copy=False)
+            else:
+                try:
+                    arr = arr.astype(np_dtype, copy=False) if np_dtype is not None else arr
+                except Exception:
+                    if np_dtype in (np.float32, np.float64):
+                        arr = pd.to_numeric(series, errors="coerce").astype(np_dtype)
+                    elif np_dtype in (np.int16, np.int32, np.int64):
+                        coerced = pd.to_numeric(series, errors="coerce")
+                        arr = coerced.fillna(0).astype(np_dtype)
+                    else:
+                        pass
+
+            bin_hdu.data[tgt] = arr
+
+    # Preserve the original table header exactly
+    bin_hdu.header.clear()
+    for card in tab_hdr.cards:
+        bin_hdu.header.append(card, end=True)
+
+    # Write output FITS
+    hdul_out = fits.HDUList([prim_hdu, bin_hdu])
+    hdul_out.writeto(output_path, overwrite=overwrite, checksum=checksum)
+    return hdul_out
 
 
 def add_healpix_id(df,
@@ -76,6 +325,8 @@ def query_weave_guide_stars(healpix_ids,
                              HEALPix indices for guide stars. This allows for better
                              guide fibre allocatcion later .Defaults to True.
     """
+
+    from workflow.utils.get_resources import get_guide_cat
 
     nside = 32
     nest = True

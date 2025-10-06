@@ -1,0 +1,45 @@
+# Core scientific and numerical packages
+numpy
+scipy
+pandas
+
+# Astronomy and FITS handling
+astropy
+astroquery
+photutils
+astropy-healpix
+healpy
+
+# Geometry and coordinate handling
+shapely
+
+# Plotting and visualisation
+matplotlib
+
+# Internal or optional workflow modules
+# (May refer to local submodules in ./workflow or ./src)
+# workflow
+# obs_limits
+# skyavoidance
+# postproc
+# preproc
+# tl_protofielding
+
+# Utility and system
+argparse
+logging
+re
+os
+sys
+json
+datetime
+subprocess
+glob
+platform
+contextlib
+tempfile
+collections
+itertools
+urllib
+traceback
+copy

@@ -415,20 +415,20 @@ def get_science_covering_guide_star_circles_fixed_grid(df,
     return list(zip(final_centers.ra.deg, final_centers.dec.deg))
 
 
-def get_science_covering_guide_star_circles(df,
-                                            ra_col='GAIA_RA',
-                                            dec_col='GAIA_DEC',
-                                            flag_col='sourceFlag',
-                                            cname_col='CNAME',
-                                            gaia_id_col='GAIA_ID',
-                                            mag_col='GAIA_MAG_G',
-                                            central_star_mag_lim=16.0,
-                                            spacing=1.5,
-                                            circle_radius=1.0,
-                                            match_radius=1.0,
-                                            move_radius=None,
-                                            min_science_per_circle=1,
-                                            random_state=42):
+def get_science_covering_guide_star_circles_greedy(df,
+                                                   ra_col='GAIA_RA',
+                                                   dec_col='GAIA_DEC',
+                                                   flag_col='sourceFlag',
+                                                   cname_col='CNAME',
+                                                   gaia_id_col='GAIA_ID',
+                                                   mag_col='GAIA_MAG_G',
+                                                   central_star_mag_lim=16.0,
+                                                   spacing=1.5,
+                                                   circle_radius=1.0,
+                                                   match_radius=1.0,
+                                                   move_radius=None,
+                                                   min_science_per_circle=1,
+                                                   random_state=42):
     """
     Compute an optimized set of guide-star-centered circles that cover science targets.
     The algorithm seeds a grid in a local tangent plane over the science footprint,
@@ -921,7 +921,7 @@ def define_fields(catalogue_df,
     organizes fields into batches.
 
     Returns:
-        tuple: (stars_in_circles, circles_df)
+        tuple: (stars_in_circles, guide_look_up_df)
     """
 
     if circles_df is None and fixed_grid:
@@ -952,7 +952,7 @@ def define_fields(catalogue_df,
 
     elif circles_df is None and not fixed_grid:
         print('Using automatic (greedy) approach for field definition.')
-        circles = get_science_covering_guide_star_circles(
+        circles = get_science_covering_guide_star_circles_greedy(
             catalogue_df,
             ra_col='GAIA_RA',
             dec_col='GAIA_DEC',

@@ -414,7 +414,7 @@ def plot_wtl_field(wtl_df, wtl_df2=None, coords='galactic', weave_fov=False,
 
 
 def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
-                         outpath=None, figsize=(8, 8), alpha=1):
+                         outpath=None, figsize=(8, 8), alpha=1, mag_col=None):
     plot_df = field_stars_df.copy()
     plot_stars = plot_df[plot_df['sourceFlag'].isin([0, 9])]
 
@@ -451,7 +451,14 @@ def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
     ax.legend(by_label.values(), by_label.keys(), markerscale=1.2, loc='upper left')
     ax.axis('equal')
 
-    ax.set_title('On-sky TL fields')
+    if mag_col is not None:
+        mag_type = mag_col.split('_')[-1]
+        ax.set_title(
+            f'On-sky TL fields - '
+            f'{plot_stars[mag_col].min():.2f} < {mag_type} < {plot_stars[mag_col].max():.2f}'
+            ' mag')
+    else:
+        ax.set_title('On-sky TL fields')
 
     if coords == 'radec':
         ax.set_xlabel('RA (hms)')
@@ -472,7 +479,8 @@ def plot_input_fits_cat(cat_df,
                         center=(0, 0),
                         figsize=(12, 6),
                         coords='radec',
-                        outpath=None):
+                        outpath=None,
+                        mag_col='GAIA_MAG_G'):
 
     fig = plt.figure(figsize=figsize)
 
@@ -486,11 +494,20 @@ def plot_input_fits_cat(cat_df,
     else:
         raise ValueError("coords must be 'radec' or 'galactic'")
 
+    mag_type = mag_col.split('_')[-1]
+
     # left panel: plain scatter
     ax0 = fig.add_subplot(1, 2, 1)
-    ax0.scatter(cat_df[coord_x], cat_df[coord_y],
-                marker='*', s=10, alpha=0.8, color='crimson',
-                label=f'Science targets; n = {cat_df.shape[0]}')
+    ax0.scatter(cat_df[coord_x],
+                cat_df[coord_y],
+                marker='*',
+                s=10,
+                alpha=0.8,
+                color='crimson',
+                label=(
+                    f'Science targets; n = {cat_df.shape[0]},\n'
+                    fr'{cat_df[mag_col].min():.2f} < {mag_type} < {cat_df[mag_col].max():.2f}')
+                )
 
     ax0.axis('equal')
     ax0.grid(True)

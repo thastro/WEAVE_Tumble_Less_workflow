@@ -1015,7 +1015,7 @@ def define_fields(catalogue_df,
     if verbose:
         print('----------------------------------------------')
         print('Batch ID assignment completed!')
-        print(f'Nr. of field batches: {num_batches}')
+        print(f'Nr. of field batches (OBs): {num_batches}')
         print('----------------------------------------------')
     stars_in_circles = stars_in_circles.astype({src_id_col: 'str'})
 

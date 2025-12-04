@@ -1,4 +1,5 @@
 resources/WG/
+resources/tess/
 xmls/
 tl_coverage*.csv
 central_target_list*.csv
@@ -21,3 +22,9 @@ gaia_crossmatch_beck.ipynb
 Untitled.ipynb
 *.xml
 KeplerMainSequence_kics.txt
+circle_configurations.py
+Kepler_field_DIEGO_BECK.ipynb
+WASP_FITS_WTLS_cat_creation.ipynb
+WTLS_TESS_extension.ipynb
+__pycache__/
+gaia_crossmatch_DIEGO_BECK.ipynb

@@ -317,10 +317,10 @@ def assign_fibre_ids(df,
             df.loc[(df['fibreId'] == star['fibreId']) &
                    (df.index != index), 'fibreId'] = np.nan
 
-    # Drop duplicate stars based on source ID, keeping the last occurrence
+    # Drop duplicate stars based on source ID, keeping the first occurrence
     # (arbitrary choice, keeping 'last' also works)
     if df['fibreId'].isna().any():
-        df = df.drop_duplicates(subset=src_id, keep='first')
+        df = df.drop_duplicates(subset=[src_id, 'GAIA_DR'], keep='first')
 
     # First initial update of fibre IDs acts as intial assignment
     free_fibre_ids = _update_free_fibre_ids(df, fibre_ids)
@@ -1686,7 +1686,8 @@ def sample_sky_fibre_coordinates(
     new_rows = new_rows[shared_cols + other_cols]
 
     # Keep original science + any prior sky (-1), then append the new sky rows
-    df_keep = batch_df[batch_df['sourceFlag'].isin([0, -1])]
+    # df_keep = batch_df[batch_df['sourceFlag'].isin([0, -1])]
+    df_keep = batch_df[batch_df['sourceFlag'] != 9]
 
     return pd.concat([df_keep, new_rows], ignore_index=True)
 

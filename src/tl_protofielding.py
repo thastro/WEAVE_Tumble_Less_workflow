@@ -1035,11 +1035,6 @@ class TLDriverCat:
         elif h_suffix == 'S':
             pa = '0'
 
-        # Prints
-        print('-----------------------------------------------------------------------')
-        print(f'Processing TL OB batch-ID: {batch_id}; field plate: {plate}; pa: {pa}')
-        print('-----------------------------------------------------------------------')
-
         targsrvy_list = list(set([target['TARGSRVY'] for target in self.data]))
         targsrvy_list = list(filter(None, targsrvy_list))
         targsrvy_list.sort()
@@ -1075,6 +1070,13 @@ class TLDriverCat:
 
         field_centres = [SkyCoord(ra*u.degree, dec*u.degree, frame='icrs')
                          for ra, dec in zip(field_batch['GAIA_RA'], field_batch['GAIA_DEC'])]
+
+        # pa = get_pa_from_field_batch_centres(field_centres)
+
+        # Prints
+        print('-----------------------------------------------------------------------')
+        print(f'Processing TL OB batch-ID: {batch_id}; field plate: {plate}; pa: {pa}')
+        print('-----------------------------------------------------------------------')
 
         targprogs = set(field_batch['TARGPROG'])
         tarprog_mask = np.array([targprog in targprogs
@@ -1547,6 +1549,83 @@ def create_guide_stars_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra', d
         csv_name = f'guide_stars_{plate}.csv'
 
     cat_frame.to_csv(output_dir + csv_name, index=False)
+
+
+def get_pa_from_field_batch_centres(coord_list, tol=1e-10, max_iter=100):
+    """
+    Geometric (L1) spherical median of a list of SkyCoord, plus PA.
+    PA rule: 0 deg if median Dec < 28 deg, else 180 deg. This i used by configure.
+
+    Returns
+    -------
+    median_coord : SkyCoord
+        Spherical geometric median.
+    pa : float
+        Position angle in degrees (0 or 180).
+    """
+    n = len(coord_list)
+    if n == 0:
+        raise ValueError("coord_list is empty")
+    if n == 1:
+        median_coord = coord_list[0]
+        pa = 0.0 if median_coord.dec.deg < 28.0 else 180.0
+        return median_coord, pa
+
+    coords = SkyCoord(coord_list)
+    xyz = coords.cartesian.xyz.value.T  # (N, 3)
+
+    # Special case n == 2: great-circle midpoint unless antipodal
+    if n == 2:
+        v = xyz[0] + xyz[1]
+        norm = np.linalg.norm(v)
+        if norm < 1e-15:  # antipodal -> just pick first
+            median_coord = coords[0]
+        else:
+            v /= norm
+            median_coord = SkyCoord(
+                x=v[0], y=v[1], z=v[2],
+                frame=coords.frame,
+                representation_type='cartesian'
+            )
+        pa = 0.0 if median_coord.dec.deg < 28.0 else 180.0
+        return median_coord, pa
+
+    # Initial guess: normalised vector mean; fallback to first if degenerate
+    v = np.mean(xyz, axis=0)
+    norm = np.linalg.norm(v)
+    if norm < 1e-15:
+        v = xyz[0] / np.linalg.norm(xyz[0])
+    else:
+        v /= norm
+
+    for _ in range(max_iter):
+        dots = np.clip(xyz @ v, -1.0, 1.0)
+        ang = np.arccos(dots)
+
+        mask = ang > 1e-12
+        if not np.any(mask):
+            break
+
+        w = 1.0 / ang[mask]
+        weighted = (xyz[mask] * w[:, None]).sum(axis=0)
+        norm = np.linalg.norm(weighted)
+        if norm < 1e-15:
+            break
+
+        v_new = weighted / norm
+        if np.linalg.norm(v_new - v) < tol:
+            v = v_new
+            break
+        v = v_new
+
+    median_coord = SkyCoord(
+        x=v[0], y=v[1], z=v[2],
+        frame=coords.frame,
+        representation_type='cartesian'
+    )
+    pa = 0.0 if median_coord.dec.deg < 28.0 else 180.0
+
+    return pa
 
 
 def assign_obstemp(catalogue_df,

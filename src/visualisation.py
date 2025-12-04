@@ -413,10 +413,380 @@ def plot_wtl_field(wtl_df, wtl_df2=None, coords='galactic', weave_fov=False,
     return ax1
 
 
+def plot_wtl_field_general(
+    wtl_df,
+    wtl_df2=None,
+    coords='galactic',
+    weave_fov=False,
+    scaling_factor=1.0,
+    fontsize=16,
+    show_coverage=False,
+    star_color='k',
+    host_color='crimson',
+    candidate_color='darkblue',
+    host_flags=(4, 5),
+    candidate_flags=(7,),
+    ax1_title=None,
+    ax2_title=None,
+    ra_col='ra',
+    de_col='dec',
+    center=None,
+):
+    """
+    Generalised WTL field plotter.
+
+    Parameters
+    ----------
+    wtl_df : DataFrame
+        Main field catalogue; all sources are plotted.
+    wtl_df2 : DataFrame or None, optional
+        Second field catalogue to plot side-by-side.
+    coords : {'galactic', 'radec'}
+        Coordinate system for the WCS projection.
+    weave_fov : bool
+        If True, plot WEAVE FOV circles for all pointings in each field.
+    scaling_factor : float
+        Scaling factor passed to plot_WTL_wcs_circles.
+    fontsize : int
+        Base font size for labels and titles.
+    show_coverage : bool
+        If True, plot only fields with full guide-fibre coverage
+        (batchScore in [3, 33, 333]) and colour them differently.
+        This also overrides weave_fov=False.
+    star_color : str
+        Color for plotting all stars.
+    host_color : str
+        Edge color for host markers.
+    candidate_color : str
+        Edge color for candidate host markers.
+    host_flags : tuple or list
+        sourceFlag values to treat as "known hosts".
+    candidate_flags : tuple or list
+        sourceFlag values to treat as "candidate hosts".
+    ax1_title : str or None
+        Title for first axis.
+    ax2_title : str or None
+        Title for second axis (if None, uses ax1_title).
+    ra_col, de_col : str
+        Column names for longitude and latitude in degrees.
+    center : None, tuple, or tuple of tuples
+        If None, use median positions of the data as in the original version.
+        If a single tuple (ra, dec) is provided, use it as the centre for the first
+        (or only) plot. If a second field is plotted and `center` is a tuple of two
+        tuples, e.g. ((ra1, dec1), (ra2, dec2)), use them for the first and second
+        plots respectively.
+    """
+
+    from astropy.visualization.wcsaxes import add_scalebar
+    from matplotlib.font_manager import FontProperties
+    import astropy.units as u
+
+    # Label for FOV circles
+    circle_label = r'$\pi$ deg$^2$ WEAVE FOV'
+    if show_coverage:
+        weave_fov = False  # coverage plot replaces generic FOV circles
+        circle_label = 'complete guide fibre coverage'
+
+    # Figure layout
+    figsize = (10, 10)
+    ncols = 1
+    if wtl_df2 is not None:
+        ncols = 2
+        figsize = (20, 10)
+
+    # WCS coordinate system
+    if coords == 'galactic':
+        wcs_coords = ('GLON-', 'GLAT-')
+        x_label = 'Galactic Longitude (deg)'
+        y_label = 'Galactic Latitude (deg)'
+    elif coords == 'radec':
+        wcs_coords = ('RA---', 'DEC--')
+        x_label = 'RA (hms)'
+        y_label = 'DEC (deg)'
+    else:
+        raise ValueError("coords must be 'galactic' or 'radec'")
+
+    # Field centres
+    if center is None:
+        # Original behaviour: use median position of sources
+        center1 = (wtl_df[ra_col].median(), wtl_df[de_col].median())
+        center2 = None
+        if wtl_df2 is not None:
+            center2 = (wtl_df2[ra_col].median(), wtl_df2[de_col].median())
+    else:
+        # centre explicitly provided
+        if wtl_df2 is None:
+            # Single panel
+            if isinstance(center[0], (tuple, list)):
+                # User accidentally passed a tuple of tuples; take the first
+                center1 = tuple(center[0])
+            else:
+                center1 = tuple(center)
+            center2 = None
+        else:
+            # Two panels
+            # If a single (ra, dec) is given, use for both; if two, use separately
+            if len(center) == 2 and not isinstance(center[0], (tuple, list)):
+                center1 = tuple(center)
+                center2 = tuple(center)
+            else:
+                center1 = tuple(center[0])
+                center2 = tuple(center[1])
+
+    fig = plt.figure(figsize=figsize)
+
+    # ------------------------------------------------------------------
+    # First field
+    # ------------------------------------------------------------------
+    ax1 = create_wcs_ax(
+        fig=fig,
+        center=center1,
+        coords=wcs_coords,
+        projection='AIT',
+        nrows=1,
+        ncols=ncols,
+        index=1,
+    )
+
+    # All stars
+    wcs_plot(
+        wtl_df[~wtl_df['sourceFlag'].isin([-1, 9])],
+        ra_col=ra_col,
+        de_col=de_col,
+        ax=ax1,
+        alpha=1.0,
+        color=star_color,
+    )
+    # Dummy handle for legend
+    ax1.scatter([], [], color=star_color, s=40, label='All stars')
+
+    # WEAVE FOV circles
+    if weave_fov:
+        plot_WTL_wcs_circles(
+            wtl_df,
+            ra_col=ra_col,
+            de_col=de_col,
+            ax=ax1,
+            label=circle_label,
+            alpha=0.5,
+            scaling_factor=scaling_factor,
+        )
+
+    # Guide-fibre coverage circles (subset by batchScore)
+    if show_coverage and 'batchScore' in wtl_df.columns:
+        full_guides = wtl_df[wtl_df['batchScore'].isin([3, 33, 333])]
+        if not full_guides.empty:
+            plot_WTL_wcs_circles(
+                full_guides,
+                ra_col=ra_col,
+                de_col=de_col,
+                ax=ax1,
+                label=circle_label,
+                alpha=0.3,
+                facecolor='lightgreen',
+                scaling_factor=scaling_factor,
+            )
+
+    # Known hosts
+    if host_flags is not None and len(host_flags) > 0:
+        hosts1 = wtl_df[wtl_df['sourceFlag'].isin(host_flags)]
+        if not hosts1.empty:
+            wcs_plot(
+                hosts1,
+                ra_col=ra_col,
+                de_col=de_col,
+                ax=ax1,
+                alpha=1.0,
+                label='Known hosts',
+                marker='o',
+                markersize=80,
+                facecolor='none',
+                edgecolor=host_color,
+                lw=2,
+            )
+
+    # Candidate hosts
+    if candidate_flags is not None and len(candidate_flags) > 0:
+        cand1 = wtl_df[wtl_df['sourceFlag'].isin(candidate_flags)]
+        if not cand1.empty:
+            wcs_plot(
+                cand1,
+                ra_col=ra_col,
+                de_col=de_col,
+                ax=ax1,
+                alpha=1.0,
+                label='Candidate hosts',
+                marker='D',
+                markersize=65,
+                facecolor='none',
+                edgecolor=candidate_color,
+                lw=2,
+            )
+
+    # Scalebar and cosmetics
+    fontprops = FontProperties(size=16)
+    add_scalebar(
+        ax1,
+        2 * u.deg,
+        label="2 deg",
+        color="k",
+        size_vertical=0.3,
+        fontproperties=fontprops,
+    )
+
+    ax1.set_aspect('equal', adjustable='datalim')
+    if ax1_title is not None:
+        ax1.set_title(ax1_title, fontsize=fontsize)
+    ax1.tick_params(axis='both', which='major', labelsize=18)
+    ax1.legend(loc='upper left', markerscale=1.2)
+    ax1.set_xlabel(x_label, fontsize=fontsize)
+    ax1.set_ylabel(y_label, fontsize=fontsize)
+
+    # ------------------------------------------------------------------
+    # Second field (optional)
+    # ------------------------------------------------------------------
+    if wtl_df2 is not None:
+        ax2 = create_wcs_ax(
+            fig=fig,
+            center=center2,
+            coords=wcs_coords,
+            projection='AIT',
+            nrows=1,
+            ncols=ncols,
+            index=2,
+        )
+
+        # All stars
+        wcs_plot(
+            wtl_df2,
+            ra_col=ra_col,
+            de_col=de_col,
+            ax=ax2,
+            alpha=1.0,
+            color=star_color,
+        )
+        ax2.scatter([], [], color=star_color, s=40, label='All stars')
+
+        # WEAVE FOV circles
+        if weave_fov:
+            plot_WTL_wcs_circles(
+                wtl_df2,
+                ra_col=ra_col,
+                de_col=de_col,
+                ax=ax2,
+                label=None,
+                alpha=0.5,
+                scaling_factor=scaling_factor,
+            )
+
+        # Guide-fibre coverage
+        if show_coverage and 'batchScore' in wtl_df2.columns:
+            full_guides2 = wtl_df2[wtl_df2['batchScore'].isin([3, 33, 333])]
+            if not full_guides2.empty:
+                plot_WTL_wcs_circles(
+                    full_guides2,
+                    ra_col=ra_col,
+                    de_col=de_col,
+                    ax=ax2,
+                    label=None,
+                    alpha=0.3,
+                    facecolor='lightgreen',
+                    scaling_factor=scaling_factor,
+                )
+
+        # Known hosts
+        if host_flags is not None and len(host_flags) > 0:
+            hosts2 = wtl_df2[wtl_df2['sourceFlag'].isin(host_flags)]
+            if not hosts2.empty:
+                wcs_plot(
+                    hosts2,
+                    ra_col=ra_col,
+                    de_col=de_col,
+                    ax=ax2,
+                    alpha=1.0,
+                    label='Known hosts',
+                    marker='o',
+                    markersize=80,
+                    facecolor='none',
+                    edgecolor=host_color,
+                    lw=2,
+                )
+
+        # Candidate hosts
+        if candidate_flags is not None and len(candidate_flags) > 0:
+            cand2 = wtl_df2[wtl_df2['sourceFlag'].isin(candidate_flags)]
+            if not cand2.empty:
+                wcs_plot(
+                    cand2,
+                    ra_col=ra_col,
+                    de_col=de_col,
+                    ax=ax2,
+                    alpha=1.0,
+                    label='Candidate hosts',
+                    marker='D',
+                    markersize=65,
+                    facecolor='none',
+                    edgecolor=candidate_color,
+                    lw=2,
+                )
+
+        add_scalebar(
+            ax2,
+            2 * u.deg,
+            label="2 deg",
+            color="k",
+            size_vertical=0.3,
+            fontproperties=fontprops,
+        )
+
+        ax2.set_aspect('equal', adjustable='datalim')
+        if ax2_title is not None:
+            ax2.set_title(ax2_title, fontsize=fontsize)
+        elif ax1_title is not None:
+            ax2.set_title(ax1_title, fontsize=fontsize)
+
+        ax2.tick_params(axis='both', which='major', labelsize=18)
+        ax2.set_xlabel(x_label, fontsize=fontsize)
+        ax2.set_ylabel(' ', fontsize=fontsize)
+
+        return ax1, ax2
+
+    return ax1
+
+
+
 def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
-                         outpath=None, figsize=(8, 8), alpha=1, mag_col=None):
+                         outpath=None, figsize=(8, 8), alpha=1, mag_col=None,
+                         host_flag_labels=None, plot_fov=True, show_central_star=False,
+                         star_color='k'):
+    """
+    Parameters
+    ----------
+    field_stars_df : DataFrame
+    host_flag_labels : dict or None
+        Optional mapping like {"Known planet hosts": 1, "Candidate planet hosts": 2}.
+        Values must not be -1 or 9.
+    """
     plot_df = field_stars_df.copy()
-    plot_stars = plot_df[plot_df['sourceFlag'].isin([0, 9])]
+
+    # ------------------------------------------------------------------
+    # Optional host categories: validate and adjust selection
+    # ------------------------------------------------------------------
+    if host_flag_labels is not None:
+        # assert that forbidden sourceFlag values are not used
+        flags = set(host_flag_labels.values())
+        invalid = {f for f in flags if f in (-1, 9, 0)}
+        assert not invalid, (
+            f"sourceFlag values {sorted(invalid)} are not allowed in host_flag_labels "
+            "(cannot use -1, 9 or 0)."
+        )
+
+        # Plot 0 (science), 9 (central guide) and all host flags
+        allowed_flags = {0, 9} | flags
+        plot_stars = plot_df[plot_df['sourceFlag'].isin(allowed_flags)]
+    else:
+        # Original behaviour: only 0 and 9 are considered
+        plot_stars = plot_df[plot_df['sourceFlag'].isin([0, 9])]
 
     fig = plt.figure(figsize=figsize)
 
@@ -424,26 +794,82 @@ def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
         ax = create_wcs_ax(fig=fig, center=center, coords=('RA---', 'DEC--'))
         coord_x = 'GAIA_RA'
         coord_y = 'GAIA_DEC'
-    if coords == 'galactic':
+    elif coords == 'galactic':
         ax = create_wcs_ax(fig=fig, center=center, coords=('GLON-', 'GLAT-'))
         coord_x = 'GAIA_GAL_LONG'
         coord_y = 'GAIA_GAL_LAT'
+    else:
+        raise ValueError("coords must be 'radec' or 'galactic'")
+
+    # Define marker styles for host categories (no '*')
+    host_markers = ['d', 's', '^', 'v', 'P', 'X', 'h', 'H', 'o']
+    if host_flag_labels is not None and len(host_flag_labels) > len(host_markers):
+        raise ValueError(
+            f"Not enough marker styles for {len(host_flag_labels)} host categories; "
+            f"max supported is {len(host_markers)}."
+        )
+
+    regular_markersize = 10
+    host_markersize = 2 * regular_markersize
 
     for bid in plot_df['batchId'].unique():
         plot_ss = plot_stars[(plot_stars['batchId'] == bid)]
-        if not plot_ss.empty:
-            wcs_plot(plot_ss[~plot_ss['sourceFlag'].isin([-1, 9])],
-                     ra_col=coord_x, de_col=coord_y,
-                     kepler_fov=False, alpha=0.5, fill=True, zorder=0,
-                     color='crimson', marker='*', markersize=10, ax=ax,
-                     label='Science targets')
-            wcs_plot(plot_ss[plot_ss['sourceFlag'].isin([9])], ra_col=coord_x, de_col=coord_y,
-                     kepler_fov=False, alpha=alpha, fill=True, zorder=0,
-                     color='k', marker='D', markersize=30, ax=ax,
-                     label='Central guide star')
+        if plot_ss.empty:
+            continue
+
+        # ------------------------------------------------------------------
+        # Science targets (sourceFlag == 0), excluding host flags if provided
+        # ------------------------------------------------------------------
+        if host_flag_labels is None:
+            sci_mask = ~plot_ss['sourceFlag'].isin([-1, 9])
+        else:
+            host_flags_set = set(host_flag_labels.values())
+            sci_mask = (~plot_ss['sourceFlag'].isin([-1, 9]))
+
+        sci_ss = plot_ss[sci_mask]
+        if not sci_ss.empty:
+            wcs_plot(
+                sci_ss,
+                ra_col=coord_x, de_col=coord_y,
+                kepler_fov=False, alpha=alpha, fill=True, zorder=0,
+                color=star_color, marker='*', markersize=regular_markersize, ax=ax,
+                label='Science targets',
+            )
+
+        # ------------------------------------------------------------------
+        # Central guide star(s): sourceFlag == 9
+        # ------------------------------------------------------------------
+        if show_central_star:
+            guide_ss = plot_ss[plot_ss['sourceFlag'] == 9]
+            if not guide_ss.empty:
+                wcs_plot(
+                    guide_ss,
+                    ra_col=coord_x, de_col=coord_y,
+                    kepler_fov=False, alpha=alpha, fill=True, zorder=0,
+                    color='k', marker='D', markersize=15, ax=ax,
+                    label='Central guide star',
+                )
+
+        # ------------------------------------------------------------------
+        # Host categories, if provided
+        # ------------------------------------------------------------------
+        if host_flag_labels is not None:
+            for (label, flag), marker in zip(host_flag_labels.items(), host_markers):
+                cat_ss = plot_ss[plot_ss['sourceFlag'] == flag]
+                if cat_ss.empty:
+                    continue
+                wcs_plot(
+                    cat_ss,
+                    ra_col=coord_x, de_col=coord_y,
+                    kepler_fov=False, alpha=1.0, fill=True, zorder=1,
+                    facecolor='none',edgecolor='k', marker=marker,
+                    markersize=host_markersize, ax=ax, lw=1.5,
+                    label=label,
+                )
 
     # Plot WEAVE FOV
-    plot_WTL_wcs_circles(plot_df, ra_col=coord_x, de_col=coord_y, alpha=alpha)
+    if plot_fov:
+        plot_WTL_wcs_circles(plot_df, ra_col=coord_x, de_col=coord_y, alpha=0.5)
 
     # Remove duplicated legend items
     handles, labels = ax.get_legend_handles_labels()
@@ -453,10 +879,12 @@ def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
 
     if mag_col is not None:
         mag_type = mag_col.split('_')[-1]
+        mag_ss = field_stars_df[~field_stars_df['sourceFlag'].isin([-1, 9])]
         ax.set_title(
-            f'On-sky TL fields - '
-            f'{plot_stars[mag_col].min():.2f} < {mag_type} < {plot_stars[mag_col].max():.2f}'
-            ' mag')
+            f'On-sky TL fields | '
+            f'{mag_ss[mag_col].min():.2f} < {mag_type}'
+            f' < {mag_ss[mag_col].max():.2f} mag'
+        )
     else:
         ax.set_title('On-sky TL fields')
 
@@ -474,13 +902,15 @@ def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
 
     plt.show()
 
-
+    
+    
 def plot_input_fits_cat(cat_df,
                         center=(0, 0),
                         figsize=(12, 6),
                         coords='radec',
                         outpath=None,
-                        mag_col='GAIA_MAG_G'):
+                        mag_col='GAIA_MAG_G',
+                        alpha=0.8):
 
     fig = plt.figure(figsize=figsize)
 
@@ -502,7 +932,7 @@ def plot_input_fits_cat(cat_df,
                 cat_df[coord_y],
                 marker='*',
                 s=10,
-                alpha=0.8,
+                alpha=alpha,
                 color='crimson',
                 label=(
                     f'Science targets; n = {cat_df.shape[0]},\n'
@@ -525,7 +955,7 @@ def plot_input_fits_cat(cat_df,
     )
 
     wcs_plot(cat_df, ra_col=coord_x, de_col=coord_y,
-             kepler_fov=False, alpha=0.8, fill=True, zorder=0,
+             kepler_fov=False, alpha=alpha, fill=True, zorder=0,
              color='crimson', marker='*', markersize=10, ax=ax1)
 
     ax1.axis('equal')

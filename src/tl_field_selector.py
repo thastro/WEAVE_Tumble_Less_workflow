@@ -1012,11 +1012,13 @@ def define_fields(catalogue_df,
             merge_threshold=merge_threshold, ra_col=ra_col, de_col=de_col)
     else:
         num_batches = -1
+
     if verbose:
         print('----------------------------------------------')
         print('Batch ID assignment completed!')
         print(f'Nr. of field batches (OBs): {num_batches}')
         print('----------------------------------------------')
+
     stars_in_circles = stars_in_circles.astype({src_id_col: 'str'})
 
     return stars_in_circles, guide_look_up_df

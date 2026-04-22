@@ -1207,7 +1207,7 @@ class TLDriverCat:
         batch_xml.set_obsconstraints(obsconstraints_attrib_dict)
 
         dithering_attrib_dict = {
-            'apply_dither': 0,
+            'apply_dither': -2,
             'dither_version': ""
         }
         batch_xml.set_dithering(dithering_attrib_dict)
@@ -1471,7 +1471,7 @@ def create_central_target_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra'
     if type(catalogue_csv) is pd.DataFrame:
         cat_frame = catalogue_csv
     elif isinstance(catalogue_csv, str):
-        cat_frame = pd.read_csv(catalogue_csv).astype({src_id: str})
+        cat_frame = pd.read_csv(catalogue_csv, dtype={src_id: str})
 
     cat_frame = cat_frame[cat_frame['guide'] == 1]
     cat_frame = cat_frame.dropna(subset=['fibreId'])
@@ -1529,7 +1529,7 @@ def create_guide_stars_csv(catalogue_csv, plate, hemisphere=None, ra_col='ra', d
     if type(catalogue_csv) is pd.DataFrame:
         cat_frame = catalogue_csv
     elif isinstance(catalogue_csv, str):
-        cat_frame = pd.read_csv(catalogue_csv).astype({src_id: str})
+        cat_frame = pd.read_csv(catalogue_csv, dtype={src_id: str})
 
     cat_frame = cat_frame[cat_frame['guide'].isin([1, 2])]
     cat_frame = cat_frame.dropna(subset=['fibreId'])

@@ -315,7 +315,7 @@ def assign_fibre_ids(df,
 
             # Set fibre ID to NaN for non-brightest duplicates
             df.loc[(df['fibreId'] == star['fibreId']) &
-                   (df.index != index), 'fibreId'] = np.nan
+                   (df.index != index), 'fibreId'] = pd.NA
 
     # Drop duplicate stars based on source ID, keeping the first occurrence
     # (arbitrary choice, keeping 'last' also works)
@@ -370,7 +370,7 @@ def assign_fibre_ids(df,
         central_fibre_id = next((fid for fid in reversed(free_fibre_ids) if fid != 1005), None)
 
         if central_fibre_id is None:
-            raise ValueError("No available fibre ID found other than 1005!")
+            logging.warning(f"No available fibre ID found other than 1005!")
 
     else:
         central_fibre_id = next((fid for fid in reversed(free_fibre_ids) if fid != 1005), None)
@@ -964,9 +964,20 @@ def maximize_final_batches(df,
                                                   max_sep=max_field_distance)
         df_combined = _split_invalid_batches(df_combined, invalid_offset_ids)
         df_combined = _update_batch_score(df_combined)
-        df_combined = df_combined.astype({'guide': 'int',
-                                          'batchScore': 'int',
-                                          'fieldScore': 'int'})
+        
+        for col in ["guide", "batchScore", "fieldScore"]:
+            # turn '' / ' ' / None / 'nan' into proper missing
+            df_combined[col] = (
+                df_combined[col]
+                .replace(r"^\s*$", pd.NA, regex=True)      # empty/whitespace strings -> NA
+                .replace({"nan": pd.NA, "None": pd.NA})    # common string junk -> NA
+            )
+            # coerce anything else non-numeric to reminder missing
+            df_combined[col] = pd.to_numeric(df_combined[col], errors="coerce")
+
+        df_combined = df_combined.astype({'guide': 'Int64',
+                                          'batchScore': 'Int64',
+                                          'fieldScore': 'Int64'})
 
         return df_combined
 
@@ -1210,10 +1221,10 @@ def maximize_final_batches(df,
             # Reset the fibreId for each field in the batch
             for field_id in batch_df['fieldId'].unique():
                 pairs_df.loc[(pairs_df['batchId'] == batch_id) &
-                             (pairs_df['fieldId'] == field_id), 'fibreId'] = np.nan
+                             (pairs_df['fieldId'] == field_id), 'fibreId'] = pd.NA #np.nan
                 pairs_df.loc[(pairs_df['batchId'] == batch_id) &
                              (pairs_df['fieldId'] == field_id) &
-                             (pairs_df['guide'] == 2), 'guide'] = np.nan
+                             (pairs_df['guide'] == 2), 'guide'] = pd.NA #np.nan
 
         return pairs_df
 
@@ -1721,6 +1732,256 @@ def assign_sky_attributes(df):
     return df
 
 
+def split_batches_at_max_sep(
+    df,
+    max_sep_deg=10.0,
+    batch_col="batchId",
+    field_col="fieldId",
+    guide_col="guide",
+    ra_col="GAIA_RA",
+    dec_col="GAIA_DEC",
+    targprog_col="TARGPROG",
+    batchscore_col="batchScore",
+    keep_original_batch_for_largest_group=True,
+    return_mapping=False):
+
+    """
+    Split batches so that within each resulting batch, all guide-field pairs satisfy:
+        separation <= max_sep_deg
+
+    Supported: batches with 1–3 guide fields (typical WTL case).
+
+    Updates:
+      - batchId: new ids are float but integer-valued (e.g. 75.0), unique vs existing ids
+      - TARGPROG: always "{batchIdInt}_{fieldIdInt}" (e.g. "75_11")
+      - batchScore: depends on number of fields in batch after split:
+            1 -> 3, 2 -> 33, 3 -> 333 (generalizes to n -> int("3"*n))
+
+    Only these columns are modified; all rows remain in their original fieldId.
+    """
+
+    if max_sep_deg <= 0:
+        raise ValueError("max_sep_deg must be > 0.")
+
+    required = {batch_col, field_col, guide_col, ra_col, dec_col, targprog_col, batchscore_col}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"df is missing required columns: {sorted(missing)}")
+
+    df_out = df.copy()
+
+    # ---- treat 75 and 75.0 as the same used integer id ----
+    def _to_int_or_none(x):
+        if x is None:
+            return None
+        try:
+            if isinstance(x, float) and np.isnan(x):
+                return None
+        except Exception:
+            pass
+        if isinstance(x, (bool, np.bool_)):
+            return None
+        try:
+            xf = float(x)
+        except Exception:
+            return None
+        if not np.isfinite(xf):
+            return None
+        if abs(xf - round(xf)) < 1e-9:
+            return int(round(xf))
+        return None
+
+    used_int_ids = set()
+    for v in df_out[batch_col].tolist():
+        iv = _to_int_or_none(v)
+        if iv is not None:
+            used_int_ids.add(iv)
+
+    next_int = (max(used_int_ids) + 1) if used_int_ids else 1
+
+    def _new_batch_id_float() -> float:
+        nonlocal next_int
+        while next_int in used_int_ids:
+            next_int += 1
+        bid = next_int
+        used_int_ids.add(bid)
+        next_int += 1
+        return float(bid)
+
+    def _score_from_n(n: int) -> int:
+        if n <= 0:
+            return np.nan
+        return int("3" * int(n))
+
+    # ---- guide rows as centres; ensure 1 per (batch, field) ----
+    df_guides = df_out[df_out[guide_col] == 1].copy()
+    df_guides = df_guides.drop_duplicates(subset=[batch_col, field_col], keep="first")
+
+    mapping_rows = []
+
+    for batch_id, g in df_guides.groupby(batch_col, sort=False):
+        n = len(g)
+        if n <= 1:
+            continue
+        if n > 3:
+            raise ValueError(
+                f"Batch {batch_id!r} has {n} guide fields; this function currently supports up to 3."
+            )
+
+        fields = g[field_col].tolist()
+        ra_vals = g[ra_col].to_numpy(dtype=float)
+        dec_vals = g[dec_col].to_numpy(dtype=float)
+        coords = SkyCoord(ra=ra_vals * u.deg, dec=dec_vals * u.deg, frame="icrs")
+
+        # Pairwise separations
+        # For n=2: sep01
+        # For n=3: sep01, sep02, sep12
+        def sep(i, j):
+            return coords[i].separation(coords[j]).deg
+
+        if n == 2:
+            s01 = sep(0, 1)
+            if s01 <= max_sep_deg:
+                continue  # keep as is
+            # split into two singles: keep original batch for one field, new batch for the other
+            if keep_original_batch_for_largest_group:
+                # both size 1; deterministic: keep original for smallest fieldId string
+                keep_i = 0 if str(fields[0]) <= str(fields[1]) else 1
+            else:
+                keep_i = 0
+            move_i = 1 - keep_i
+            new_id = _new_batch_id_float()
+            moved_field = fields[move_i]
+
+            mask = (df_out[batch_col] == batch_id) & (df_out[field_col] == moved_field)
+            df_out.loc[mask, batch_col] = new_id
+
+            mapping_rows.append(
+                dict(
+                    old_batchId=float(batch_id) if _to_int_or_none(batch_id) is not None else batch_id,
+                    new_batchId=new_id,
+                    fieldId=moved_field,
+                    component_index=1,
+                    n_fields_in_component=1,
+                )
+            )
+            continue
+
+        # n == 3
+        s01 = sep(0, 1)
+        s02 = sep(0, 2)
+        s12 = sep(1, 2)
+
+        # If all pairs are within threshold, keep triplet
+        if max(s01, s02, s12) <= max_sep_deg:
+            continue
+
+        # Determine which pairs are allowed
+        pairs = [
+            ((0, 1), s01),
+            ((0, 2), s02),
+            ((1, 2), s12),
+        ]
+        ok_pairs = [(ij, d) for ij, d in pairs if d <= max_sep_deg]
+
+        if len(ok_pairs) == 0:
+            # no pair qualifies => split into three singles
+            # keep original batch for one single; move the other two to new batchIds
+            order = sorted([0, 1, 2], key=lambda i: str(fields[i]))
+            keep_i = order[0] if keep_original_batch_for_largest_group else 0
+            for i in [0, 1, 2]:
+                if i == keep_i:
+                    continue
+                new_id = _new_batch_id_float()
+                moved_field = fields[i]
+                mask = (df_out[batch_col] == batch_id) & (df_out[field_col] == moved_field)
+                df_out.loc[mask, batch_col] = new_id
+                mapping_rows.append(
+                    dict(
+                        old_batchId=float(batch_id) if _to_int_or_none(batch_id) is not None else batch_id,
+                        new_batchId=new_id,
+                        fieldId=moved_field,
+                        component_index=i,
+                        n_fields_in_component=1,
+                    )
+                )
+            continue
+
+        # At least one pair qualifies => create one double (best/closest ok pair) + one single
+        (i, j), _dmin = min(ok_pairs, key=lambda t: t[1])
+        k = ({0, 1, 2} - {i, j}).pop()
+
+        # Decide which group keeps original batchId
+        # groups: double={i,j} (size2), single={k} (size1)
+        if keep_original_batch_for_largest_group:
+            keep_double = True  # size2 wins
+        else:
+            # deterministic: keep group whose fieldId-list is lexicographically smallest
+            double_key = [str(fields[x]) for x in sorted([i, j])]
+            single_key = [str(fields[k])]
+            keep_double = double_key <= single_key
+
+        if keep_double:
+            # move single to a new batch
+            new_id = _new_batch_id_float()
+            moved_field = fields[k]
+            mask = (df_out[batch_col] == batch_id) & (df_out[field_col] == moved_field)
+            df_out.loc[mask, batch_col] = new_id
+            mapping_rows.append(
+                dict(
+                    old_batchId=float(batch_id) if _to_int_or_none(batch_id) is not None else batch_id,
+                    new_batchId=new_id,
+                    fieldId=moved_field,
+                    component_index=1,
+                    n_fields_in_component=1,
+                )
+            )
+        else:
+            # keep single, move the double to a new batch
+            new_id = _new_batch_id_float()
+            moved_fields = [fields[i], fields[j]]
+            mask = (df_out[batch_col] == batch_id) & (df_out[field_col].isin(moved_fields))
+            df_out.loc[mask, batch_col] = new_id
+            for moved_field in moved_fields:
+                mapping_rows.append(
+                    dict(
+                        old_batchId=float(batch_id) if _to_int_or_none(batch_id) is not None else batch_id,
+                        new_batchId=new_id,
+                        fieldId=moved_field,
+                        component_index=0,
+                        n_fields_in_component=2,
+                    )
+                )
+
+    # ---- update TARGPROG for all rows ----
+    batch_int = pd.to_numeric(df_out[batch_col], errors="coerce").round().astype("Int64")
+    field_int = pd.to_numeric(df_out[field_col], errors="coerce").round().astype("Int64")
+
+    if batch_int.isna().any() or field_int.isna().any():
+        bad = df_out[batch_int.isna() | field_int.isna()][[batch_col, field_col, targprog_col]].head(10)
+        raise ValueError(
+            "Cannot update TARGPROG because some batchId/fieldId values are not integer-valued or are NaN. "
+            f"Examples:\n{bad}"
+        )
+
+    df_out[targprog_col] = batch_int.astype(str) + "_" + field_int.astype(str)
+
+    # ---- update batchScore based on number of guide fields per batch ----
+    guides_after = df_out[df_out[guide_col] == 1].drop_duplicates(subset=[batch_col, field_col], keep="first")
+    n_fields_per_batch = guides_after.groupby(batch_col)[field_col].nunique()
+    # batch_score_map = n_fields_per_batch.map(_score_from_n).to_dict()
+    # df_out[batchscore_col] = df_out[batch_col].map(batch_score_map)
+
+    if return_mapping:
+        mapping_df = pd.DataFrame(mapping_rows)
+        if not mapping_df.empty:
+            mapping_df["old_batchId"] = pd.to_numeric(mapping_df["old_batchId"], errors="coerce").astype(float)
+            mapping_df["new_batchId"] = pd.to_numeric(mapping_df["new_batchId"], errors="coerce").astype(float)
+        return df_out, mapping_df
+
+    return df_out
+
+
 def run_guide_fibre_allocation(df_field_selection,
                                wg_comb_df,
                                lookup_df,
@@ -1728,6 +1989,7 @@ def run_guide_fibre_allocation(df_field_selection,
                                use_degrees=True,
                                max_gate_angle=12.5,
                                plate='A',
+                               split_batch_at_max_sep=True,
                                maximize_batches=False,
                                max_field_distance=10.0,
                                guide_mag_limit=None,
@@ -1857,7 +2119,7 @@ def run_guide_fibre_allocation(df_field_selection,
     # Loop through field batches and assign guide stars and fibres
     for batch_id in batch_ids:
         batch = df_field_selection[df_field_selection['batchId'] == batch_id]
-        batch['fibreId'] = np.nan
+        batch['fibreId'] = pd.NA #np.nan
 
         batch_field_ids = set(batch['fieldId'].astype(str).unique())
 
@@ -1919,15 +2181,42 @@ def run_guide_fibre_allocation(df_field_selection,
         add_sky = False
 
         if add_sky_targets:
+            n_fields = batch["fieldId"].nunique()
+            n_sci = batch.loc[~batch["sourceFlag"].isin([-1, 9])].shape[0]
 
+            # Handle single field batches
+            if n_fields < 2:
+                if 100 <= n_sci < 300:
+                    num_samples = int(n_sci * 0.25)
+                if 50 <= n_sci < 100:
+                    num_samples = int(n_sci * 0.35)                    
+                elif 30 <= n_sci < 50:
+                    num_samples = max_num_sky_targets
+                elif 300 <= n_sci <= 900:
+                    num_samples = max_num_sky_targets
+                elif n_sci > 900:
+                    logging.warning(
+                        "More than 900 science targets! "
+                        "Adjust target count to enable sufficient sky fibre coverage!"
+                    )
+                    num_samples = 10
+                else:
+                    num_samples = 15
+            # Add up to max_num_sky_targets if more than 2 fields
+            else:
+                num_samples = max_num_sky_targets
+            """
             # For batches with only one field:
-            if ((batch['fieldId'].unique().shape[0] < 2)
-                    and (batch[~batch['sourceFlag'].isin([-1, 9])].shape[0]) < 300):
+            if (batch['fieldId'].unique().shape[0] < 2
+                    and 50 <= batch[~batch['sourceFlag'].isin([-1, 9])].shape[0] < 300):
                 # Add approx. 25% sky targets if less than 300 science targets
                 num_samples = int(batch[~batch['sourceFlag'].isin([-1, 9])].shape[0] * 0.25)
-
+            elif (batch['fieldId'].unique().shape[0] < 2
+                    and 30 <= batch[~batch['sourceFlag'].isin([-1, 9])].shape[0] < 50):
+                # Add approx. 25% sky targets if less than 300 science targets
+                num_samples = max_num_sky_targets
             elif ((batch['fieldId'].unique().shape[0] < 2)
-                    and (batch[~batch['sourceFlag'].isin([-1, 9])].shape[0]) > 300):
+                    and (batch[~batch['sourceFlag'].isin([-1, 9])].shape[0]) => 300):
                 # Add up to 80 sky targets if more than 300 science targets
                 num_samples = 80
 
@@ -1940,7 +2229,7 @@ def run_guide_fibre_allocation(df_field_selection,
             elif batch['fieldId'].unique().shape[0] >= 2:
                 # Add up to max_num_sky_targets if more than 2 fields
                 num_samples = max_num_sky_targets
-
+            """
             # Sample sky fibre coordinates and add to science_df
             science_df = sample_sky_fibre_coordinates(
                 science_df, guide_star_df, num_samples=num_samples, radius_mm=10.0,
@@ -2006,9 +2295,9 @@ def run_guide_fibre_allocation(df_field_selection,
                           (~batch['fibreId'].isna())]
 
     combined_guide_frame = pd.concat(guide_dfs).astype({src_id_col: 'str',
-                                                        'fibreId': np.int64,
-                                                        'fieldId': np.int64,
-                                                        'batchId': np.int64})
+                                                        'fibreId': 'Int64',
+                                                        'fieldId': 'Int64',
+                                                        'batchId': 'Int64'})
 
     combined_science_frame = pd.concat(science_dfs).astype({src_id_col: 'str'})
 
@@ -2043,7 +2332,8 @@ def run_guide_fibre_allocation(df_field_selection,
 
     if perfect_fields_only:
         field_selection_with_guides = field_selection_with_guides[
-                                      field_selection_with_guides['fieldScore'] >= 2]
+                                      field_selection_with_guides['fieldScore'] >= 2]   
+
 
     if maximize_batches:
         print('Maximizing fields per batch...')
@@ -2065,6 +2355,18 @@ def run_guide_fibre_allocation(df_field_selection,
 
         field_selection_with_guides = calculate_field_score(field_selection_with_guides)
         field_selection_with_guides = calculate_batch_score(field_selection_with_guides)
+
+        
+    if split_batch_at_max_sep:
+        print(f'Splitting batches with fields with a separation higher than {max_field_distance} deg...')
+        print(type(field_selection_with_guides))
+        field_selection_with_guides = split_batches_at_max_sep(field_selection_with_guides,
+                                                               max_sep_deg=max_field_distance,
+                                                               return_mapping=False)
+        
+        field_selection_with_guides = calculate_field_score(field_selection_with_guides)
+        field_selection_with_guides = calculate_batch_score(field_selection_with_guides)            
+    
 
     # Check for insufficient guide fibre allocations
     for batch_id, group in field_selection_with_guides.groupby("batchId"):

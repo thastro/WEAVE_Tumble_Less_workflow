@@ -423,15 +423,18 @@ def plot_wtl_field_general(
     show_coverage=False,
     star_color='k',
     host_color='crimson',
+    host_size=10, 
     candidate_color='darkblue',
+    obi_color='forestgreen',
+    obi_label='Object of interest',
+    obi_flags=None,
     host_flags=(4, 5),
     candidate_flags=(7,),
     ax1_title=None,
     ax2_title=None,
     ra_col='ra',
     de_col='dec',
-    center=None,
-):
+    center=None,):
     """
     Generalised WTL field plotter.
 
@@ -599,7 +602,7 @@ def plot_wtl_field_general(
                 alpha=1.0,
                 label='Known hosts',
                 marker='o',
-                markersize=80,
+                markersize=host_size,
                 facecolor='none',
                 edgecolor=host_color,
                 lw=2,
@@ -617,9 +620,27 @@ def plot_wtl_field_general(
                 alpha=1.0,
                 label='Candidate hosts',
                 marker='D',
-                markersize=65,
+                markersize=host_size,
                 facecolor='none',
                 edgecolor=candidate_color,
+                lw=2,
+            )
+
+    # Objects of interest
+    if obi_flags is not None and len(obi_flags) > 0:
+        obi1 = wtl_df[wtl_df['sourceFlag'].isin(obi_flags)]
+        if not obi1.empty:
+            wcs_plot(
+                obi1,
+                ra_col=ra_col,
+                de_col=de_col,
+                ax=ax1,
+                alpha=1.0,
+                label=obi_label,
+                marker='^',
+                markersize=host_size,
+                facecolor='none',
+                edgecolor=obi_color,
                 lw=2,
             )
 
@@ -758,7 +779,7 @@ def plot_wtl_field_general(
 def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
                          outpath=None, figsize=(8, 8), alpha=1, mag_col=None,
                          host_flag_labels=None, plot_fov=True, show_central_star=False,
-                         star_color='k'):
+                         star_color='k', star_markersize=5):
     """
     Parameters
     ----------
@@ -809,8 +830,8 @@ def plot_tl_fov_coverage(field_stars_df, center=(0, 0), coords='radec',
             f"max supported is {len(host_markers)}."
         )
 
-    regular_markersize = 10
-    host_markersize = 2 * regular_markersize
+    regular_markersize = star_markersize
+    host_markersize = 4 * regular_markersize
 
     for bid in plot_df['batchId'].unique():
         plot_ss = plot_stars[(plot_stars['batchId'] == bid)]

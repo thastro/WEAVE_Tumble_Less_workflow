@@ -15,10 +15,8 @@ def setup_directories(base_dir="."):
 
     dirs = [
         "xmls",
-        "xmls/plate_A/N",
-        "xmls/plate_A/S",
-        "xmls/plate_B/N",
-        "xmls/plate_B/S",
+        "xmls/plate_A/",
+        "xmls/plate_B/",
         "xmls/configure_A/finalized_A",
         "xmls/configure_B/finalized_B",
         "resources/WG"

@@ -422,8 +422,8 @@ def assign_guide_fibres(merged_df,
             - `Vx`, `Vy` (float): central guide coordinates in the same frame,
             - columns named by `mag_col`, `ra_col`, `de_col`, `src_id` (see below).
         max_gate_angle (float): Half-opening angle (degrees) of a gate's reach cone.
-        hemisphere (str): Observation hemisphere, 'N' (north) or 'S' (south). Affects
-            fibre-ID ordering/rotation.
+        hemisphere (str): Retained for API compatibility. The actual N/S PA orientation
+            is derived automatically from the central field declinations.
         plate (str): Plate identifier, 'A' or 'B'. Used with `broken_fibres`.
         guide_mag_limit (float, optional): Maximum magnitude for guide candidates. If
             provided, fainter stars are excluded before allocation. Defaults to None.
@@ -463,7 +463,8 @@ def assign_guide_fibres(merged_df,
     Raises:
         KeyError: If required columns are missing (e.g., `fieldId`, `sourceFlag`,
           `guide`, `X`, `Y`, `Vx`, `Vy`, `mag_col`, `src_id`).
-        ValueError: If `hemisphere` not in {'N','S'} or `plate` not in {'A','B'}.
+        ValueError: If a batch contains fields requiring both PA orientations, or if
+          `plate` not in {'A','B'}.
     """
 
     def _is_point_in_triangle(pt, A, B, C):
@@ -564,8 +565,23 @@ def assign_guide_fibres(merged_df,
 
     # Hardcoded guide fibre ids for WEAVE (DO NOT CHANGE!!!)
     fibre_ids_n = np.array([249, 123, 1005, 879, 753, 627, 501, 375])
-    fibre_ids_s = np.roll(fibre_ids_n, -4)  # rolled by 4, accounting for negative Declination
+    fibre_ids_s = np.roll(fibre_ids_n, -4)  # rolled by 4, accounting for PA=0 orientation
     angles = np.array([0, 45, 90, 135, 180, 225, 270, 315])
+
+    # Determine the WEAVE PA orientation directly from the central field positions.
+    # PA=0 (S) applies south of +28.7 deg; PA=180 (N) applies at/north of +28.7 deg.
+    central_guides = merged_df[(merged_df['sourceFlag'] == 9) & (merged_df['guide'] == 1)]
+    if central_guides.empty:
+        raise ValueError('Cannot determine PA orientation: no central guide stars found.')
+
+    pa_orientations = np.where(central_guides[de_col].astype(float) >= 28.7, 'N', 'S')
+    unique_orientations = np.unique(pa_orientations)
+    if len(unique_orientations) != 1:
+        raise ValueError(
+            'Batch contains fields requiring both PA=0 and PA=180. '
+            'Mixed-orientation batches must be split before guide-fibre allocation.'
+        )
+    hemisphere = unique_orientations[0]
 
     # Check if broken fibres are provided, if not, set to empty dict.
     # Also take hemisphere into account.
@@ -872,6 +888,12 @@ def maximize_final_batches(df,
         """
 
         subset = df[df['fieldId'].isin(field_ids)]
+        central_subset = subset[subset['guide'] == 1].drop_duplicates('fieldId')
+        if not central_subset.empty:
+            orientations = np.where(central_subset[de_col].astype(float) >= 28.7, 'N', 'S')
+            if len(np.unique(orientations)) != 1:
+                return None
+
         guides = master_df[(master_df['fieldId'].isin(field_ids)) &
                            (~master_df['guide'].isin([1, 2])) &
                            (master_df['sourceFlag'] == 9)]
@@ -1985,7 +2007,7 @@ def split_batches_at_max_sep(
 def run_guide_fibre_allocation(df_field_selection,
                                wg_comb_df,
                                lookup_df,
-                               hemisphere,
+                               hemisphere=None,
                                use_degrees=True,
                                max_gate_angle=12.5,
                                plate='A',
@@ -2159,10 +2181,21 @@ def run_guide_fibre_allocation(df_field_selection,
         merged_fields = zpn_projection(batch=batch, ra_col=ra_col, de_col=de_col)
         science_df = merged_fields[merged_fields['sourceFlag'] != 9].copy()
 
+        central_guides = merged_fields[(merged_fields['sourceFlag'] == 9) &
+                                       (merged_fields['guide'] == 1)]
+        pa_orientations = np.where(central_guides[de_col].astype(float) >= 28.7, 'N', 'S')
+        unique_orientations = np.unique(pa_orientations)
+        if len(unique_orientations) != 1:
+            raise ValueError(
+                f'Batch {batch_id} contains fields requiring both PA=0 and PA=180. '
+                'The field selector must split this batch before guide-fibre allocation.'
+            )
+        batch_hemisphere = unique_orientations[0]
+
         # Allocate guide fibres to accomodate the superposition of fields.
         guide_star_df = assign_guide_fibres(merged_fields,
                                             max_gate_angle,
-                                            hemisphere=hemisphere,
+                                            hemisphere=batch_hemisphere,
                                             guide_mag_limit=guide_mag_limit,
                                             plate=plate,
                                             ra_col=ra_col,
@@ -2432,8 +2465,9 @@ def run_guide_fibre_allocation(df_field_selection,
     # field_selection_with_guides = decode_byte_columns(field_selection_with_guides)
 
     # Save the DataFrame to a CSV file
+    coverage_suffix = hemisphere if hemisphere is not None else 'AUTO'
     field_selection_with_guides.to_csv(
-        f'{outpath}tl_coverage_plate_{plate}_{hemisphere}.csv', index=False)
+        f'{outpath}tl_coverage_plate_{plate}_{coverage_suffix}.csv', index=False)
 
     # Assign TARGPROG values to enable correct xml creation
     field_selection_with_guides = assign_targprog(field_selection_with_guides)

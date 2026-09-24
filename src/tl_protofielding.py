@@ -911,7 +911,7 @@ class TLDriverCat:
                       progtemp,
                       obstemp,
                       plate,
-                      h_suffix,
+                      h_suffix=None,
                       exposure_time=1200,
                       calib_stars=True,
                       field_name='WTL_test',
@@ -1027,14 +1027,6 @@ class TLDriverCat:
             obsgroup = ''
             obsgroup_validity = ''
 
-        assert h_suffix in ['N', 'S'], "Invalid hemisphere suffix. Use 'N' or 'S'."
-
-        # Set the position angle based on hemisphere
-        if h_suffix == 'N':
-            pa = '180'
-        elif h_suffix == 'S':
-            pa = '0'
-
         targsrvy_list = list(set([target['TARGSRVY'] for target in self.data]))
         targsrvy_list = list(filter(None, targsrvy_list))
         targsrvy_list.sort()
@@ -1056,6 +1048,22 @@ class TLDriverCat:
         # Create XML files for TL-CONFIGURE
         central_target_table = Table.read(target_csv)
         field_batch = central_target_table[central_target_table['batchId'] == batch_id]
+
+        field_dec = np.asarray(field_batch['GAIA_DEC'], dtype=float)
+        pa_orientations = np.where(field_dec >= 28.7, 'N', 'S')
+        unique_orientations = np.unique(pa_orientations)
+        if len(unique_orientations) != 1:
+            raise ValueError(
+                f'Batch {batch_id} contains fields requiring both PA=0 and PA=180. '
+                'Mixed-orientation batches must be split before XML creation.'
+            )
+
+        h_suffix = unique_orientations[0]
+        pa = '180' if h_suffix == 'N' else '0'
+
+        output_dir_norm = os.path.normpath(output_dir)
+        if os.path.basename(output_dir_norm) in ['N', 'S', 'AUTO']:
+            output_dir = os.path.join(os.path.dirname(output_dir_norm), h_suffix, '')
 
         # num_fields_in_batch = len(np.unique(field_batch['fieldId'], return_counts=True))
         num_fields_in_batch = len(field_batch['fieldId'])
@@ -1350,19 +1358,38 @@ class TLDriverCat:
         # Set the prefix of the output file if it has not been provided
         if prefix is None:
             prefix = self.default_prefix
-        split_prefix = prefix.split('_')
-        prefix = split_prefix[0] + '_' + f'p{split_prefix[-2]}' + '_'
 
-        # print(split_prefix)
+        split_prefix = prefix.split('_')
+
+        survey_prefix = split_prefix[0]
+        plate_suffix = f'pl{split_prefix[-2]}'
+
+        # Convert internal orientation suffix to explicit PA label
+        if h_suffix == 'N':
+            pa_suffix = 'pa180'
+        elif h_suffix == 'S':
+            pa_suffix = 'pa0'
+        else:
+            pa_suffix = str(h_suffix)
+
         # Choose the first filename which does not exist
         index = 0
         output_path = ''
 
         while (index < 1) or os.path.exists(output_path):
             index += 1
-            output_basename = '{}{}_{:02d}_b{}_{}.xml'.format(
-                prefix, field_name, index, str(int(suffix)).zfill(3), h_suffix)
+
+            output_basename = '{}_{}_{:02d}_{}_{}_b{}.xml'.format(
+                survey_prefix,
+                field_name,
+                index,
+                plate_suffix,
+                pa_suffix,
+                str(int(suffix)).zfill(3)
+            )
+
             output_path = os.path.join(output_dir, output_basename)
+
         return output_path
 
     def finalize_tl_ob(self, config_ob_xml, progtemp, output_dir,
@@ -1759,7 +1786,7 @@ def assign_target_attributes(catalogue_df,
 def create_plate_fits_file(infile,
                            coverage_df,
                            plate='A',
-                           hemisphere='N',
+                           hemisphere=None,
                            outpath='./',
                            src_id_col='CNAME',  # src id column name in FITS table to match on
                            coverage_targprog_col='TARGPROG'):
@@ -1774,8 +1801,8 @@ def create_plate_fits_file(infile,
         `coverage_df[coverage_targprog_col]`, matched by `src_id_col`,
       - appends “sky” rows from `coverage_df` where `sourceFlag == -1` and the
         `src_id_col` value is blank (these are not matched by ID),
-      - writes the result as `<outpath>/<infile_base>_<plate>_<hemisphere>.fits`
-        with FITS checksums,
+      - writes the result as `<outpath>/<infile_base>_<plate>_<suffix>.fits`
+        with FITS checksums, where automatic mode uses the suffix `AUTO`,
       - and returns the first non-empty unique `PROGTEMP` and `OBSTEMP` strings
         found among non-sky rows.
 
@@ -1790,8 +1817,8 @@ def create_plate_fits_file(infile,
             sky rows) `sourceFlag`.
         plate (str, optional): Plate identifier ('A' or 'B'). If not None, CSV helper
             files for guides/central targets are written. Defaults to 'A'.
-        hemisphere (str, optional): Hemisphere code ('N' or 'S') passed to the helper
-            CSV writers. Defaults to 'N'.
+        hemisphere (str, optional): Legacy filename suffix. If omitted, automatic mode
+            uses `AUTO`. It does not determine the guide-fibre orientation or XML PA.
         outpath (str, optional): Output directory for the new FITS and helper CSVs.
             Defaults to './'.
         src_id_col (str, optional): Column name used to match rows (e.g. 'CNAME').
@@ -1811,7 +1838,7 @@ def create_plate_fits_file(infile,
         - Only extension 1 (the main target table) is filtered/updated; all other HDUs
           are preserved as-is.
         - The output filename is derived from `infile` (base name) plus
-          `_<plate>_<hemisphere>.fits`.
+          `_<plate>_<suffix>.fits`; automatic mode uses `_AUTO`.
 
     Raises:
         TypeError: If `coverage_df` is not a pandas DataFrame.
@@ -1879,13 +1906,15 @@ def create_plate_fits_file(infile,
 
     infile_name = infile.split("/")[-1].split(".")[0]
 
+    product_suffix = hemisphere if hemisphere is not None else 'AUTO'
+
     if plate is not None:
         create_guide_stars_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
-                               de_col='GAIA_DEC', src_id=src_id_col, hemisphere=hemisphere,
+                               de_col='GAIA_DEC', src_id=src_id_col, hemisphere=product_suffix,
                                output_dir=outpath)
         create_central_target_csv(coverage_df, plate=plate, ra_col='GAIA_RA',
                                   de_col='GAIA_DEC', mag_col='GAIA_MAG_G',
-                                  hemisphere=hemisphere,
+                                  hemisphere=product_suffix,
                                   src_id=src_id_col, output_dir=outpath)
 
     if not isinstance(coverage_df, pd.DataFrame):
@@ -2012,7 +2041,7 @@ def create_plate_fits_file(infile,
             new_hdul.append(new_tbl)
 
         # Write with checksums
-        outfile = f"{outpath}{infile_name}_{plate}_{hemisphere}.fits"
+        outfile = f"{outpath}{infile_name}_{plate}_{product_suffix}.fits"
         new_hdul.writeto(outfile, overwrite=True, checksum=True)
 
     # Extract PROGTEMP / OBSTEMP from non-sky, non-empty rows

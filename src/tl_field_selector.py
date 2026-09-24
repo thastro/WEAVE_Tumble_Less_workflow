@@ -1013,6 +1013,48 @@ def define_fields(catalogue_df,
     else:
         num_batches = -1
 
+    # Ensure that every batch uses a single WEAVE position-angle orientation.
+    # Fields south of +28.7 deg use PA=0 (S), while fields at or north of
+    # +28.7 deg use PA=180 (N). Only batches that straddle this boundary are split.
+    if 'batchId' in stars_in_circles.columns:
+        pa_dec_boundary = 28.7
+        central_fields = (
+            stars_in_circles[stars_in_circles['guide'] == 1]
+            [['fieldId', 'batchId', de_col]]
+            .drop_duplicates(subset='fieldId')
+            .copy()
+        )
+        central_fields['_pa_orientation'] = np.where(
+            central_fields[de_col] >= pa_dec_boundary, 'N', 'S')
+
+        if not central_fields.empty:
+            next_batch_id = int(stars_in_circles['batchId'].max()) + 1
+
+            for batch_id, batch_fields in central_fields.groupby('batchId', sort=True):
+                orientations = batch_fields['_pa_orientation'].unique()
+                if len(orientations) <= 1:
+                    continue
+
+                first_field_id = batch_fields['fieldId'].min()
+                keep_orientation = batch_fields.loc[
+                    batch_fields['fieldId'] == first_field_id, '_pa_orientation'].iloc[0]
+
+                for orientation in orientations:
+                    if orientation == keep_orientation:
+                        continue
+
+                    fields_to_move = batch_fields.loc[
+                        batch_fields['_pa_orientation'] == orientation, 'fieldId']
+
+                    stars_in_circles.loc[
+                        (stars_in_circles['batchId'] == batch_id) &
+                        (stars_in_circles['fieldId'].isin(fields_to_move)),
+                        'batchId'
+                    ] = next_batch_id
+                    next_batch_id += 1
+
+            num_batches = stars_in_circles['batchId'].nunique()
+
     if verbose:
         print('----------------------------------------------')
         print('Batch ID assignment completed!')

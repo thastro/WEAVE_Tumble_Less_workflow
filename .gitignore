@@ -28,3 +28,5 @@ WASP_FITS_WTLS_cat_creation.ipynb
 WTLS_TESS_extension.ipynb
 __pycache__/
 gaia_crossmatch_DIEGO_BECK.ipynb
+__pycache__/
+*.py[cod]

@@ -1446,14 +1446,14 @@ class TLDriverCat:
         # Rename the twilight_configure_version attribute to configure_version:
         configure_element.setAttribute(
             'configure_version',
-            configure_element.getAttribute('twilight_configure_version')
+            configure_element.getAttribute('multi_field_configure_version')
         )
-        configure_element.removeAttribute('twilight_configure_version')
+        configure_element.removeAttribute('multi_field_configure_version')
 
         # get configure version value and remove the "t" character
-        configure_version = configure_element.getAttribute('configure_version')
-        configure_version = configure_version.split('t')[0]
-        configure_element.setAttribute('configure_version', configure_version)
+        #configure_version = configure_element.getAttribute('configure_version')
+        #configure_version = configure_version.split('t')[0]
+        #configure_element.setAttribute('configure_version', configure_version)
 
         # get epoch which is in the subelement conditions of the batch_xml.observation elemnt
         epoch = (

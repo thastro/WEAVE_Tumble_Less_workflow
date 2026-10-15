@@ -1,0 +1,119 @@
+#!/bin/bash
+
+input_path_base="./xmls/plate"
+output_path_base="./xmls/configure"
+
+
+epoch=2024.0
+plate="A"
+fibre_status_file=""
+
+# Parse command line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --epoch) epoch="$2"; shift ;;
+        --plate) plate="$2"; shift ;;
+        --fibre_status) fibre_status_file="$2"; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Validate inputs
+if [[ -z "$fibre_status_file" ]]; then
+    echo "Error: --fibre_status must be specified."
+    exit 1
+fi
+
+if [[ ! -f "$fibre_status_file" ]]; then
+    echo "Error: Fibre status file '$fibre_status_file' not found."
+    exit 1
+fi
+
+if [[ "$plate" == "A" ]]; then
+    input_path="${input_path_base}_A"
+    output_path="${output_path_base}_A"
+elif [[ "$plate" == "B" ]]; then
+    input_path="${input_path_base}_B"
+    output_path="${output_path_base}_B"
+else
+    echo "Unknown plate value passed: $plate. Expected 'A' or 'B'."
+    exit 1
+fi
+
+# Run fibre status command once before loop
+echo "Running twilight_configure --fibre_status with: $fibre_status_file"
+
+
+# Configuration success counters
+successful_configs=0
+failed_configs=0
+total_configs=0
+
+# Store failed configuration details
+failed_config_report=""
+
+
+# Loop through each .xml file in the input directory
+count=1
+for file in "$input_path"/*.xml; do
+    if [[ ! -f "$file" ]]; then
+        echo "No XML files found in $input_path"
+        exit 1
+    fi
+
+    filename=$(basename -- "$file")
+    output_file="${output_path}/${filename%.xml}_${epoch}_conf.xml"
+
+    echo "Processing $file -> $output_file"
+
+    command_output=$(
+        /home/thajnik/Software/configure/./multi_field_configure \
+            --fibre_status "$fibre_status_file" \
+            --epoch "$epoch" \
+            -f "$file" \
+            -o "$output_file" 2>&1
+    )
+
+    # Print twilight_configure output
+    echo "$command_output"
+
+    # ONLY count configuration as failed if this specific message occurs
+    if echo "$command_output" | grep -Fqi "field position angle is outside the rotator limits"; then
+        ((failed_configs++))
+
+        error_line=$(echo "$command_output" | grep -Fi "field position angle is outside the rotator limits")
+
+        failed_config_report+="${filename}: ${error_line}"$'\n'
+    else
+        ((successful_configs++))
+    fi
+
+    ((total_configs++))
+    ((count++))
+done
+
+
+# Save configuration summary
+timestamp=$(date +"%Y%m%d_%H:%M")
+summary_file="${output_path}/tl_configure_summary_${timestamp}.txt"
+
+{
+    echo "TL configure summary"
+    echo "Date/time: $(date +"%Y-%m-%d %H:%M")"
+    echo "Plate: $plate"
+    echo "Epoch: $epoch"
+    echo ""
+    echo "Total configurations: $total_configs"
+    echo "Successful configurations: $successful_configs"
+    echo "Failed configurations: $failed_configs"
+
+    if [[ $failed_configs -gt 0 ]]; then
+        echo ""
+        echo "Failed configuration details:"
+        echo "-----------------------------"
+        printf "%s" "$failed_config_report"
+    fi
+} > "$summary_file"
+
+echo "Configuration summary saved to: $summary_file"
